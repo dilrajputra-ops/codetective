@@ -386,10 +386,14 @@ def detail(login: str) -> dict:
     commits_90d = sum(1 for c in commits if _days_ago(c["date"]) <= 90)
     total_commits = sum(r["commits"] for r in _load_shortlog() if r["email"] in emails)
 
-    # Derive a team list from gh_teams cache.
+    # Derive a team list from gh_teams cache. Catch-all teams (engineering /
+    # read-only-members) are filtered — they're noise on a personal profile
+    # since virtually everyone is in them.
     team_cache = gh_teams._load_cache() or {}  # type: ignore[attr-defined]
     teams = []
     for slug, entry in team_cache.items():
+        if slug in _NOISY_TEAM_SLUGS:
+            continue
         for m in entry.get("members") or []:
             if (m.get("login") or "").lower() == login.lower():
                 teams.append({
