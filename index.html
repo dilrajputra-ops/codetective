@@ -167,6 +167,10 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .contrib-stats{font-size:11px;color:var(--faint);font-family:"SF Mono",ui-monospace,monospace}
 .contrib-toggle{font-size:11px;color:var(--accent);cursor:pointer;font-weight:600}
 .contrib-toggle:hover{text-decoration:underline}
+.contrib-score{font-size:11px;color:var(--faint);font-family:"SF Mono",ui-monospace,monospace;
+  margin-left:6px;padding:1px 6px;border-radius:4px;background:var(--code-bg);cursor:help}
+.contrib-card.departed{opacity:0.55}
+.contrib-card.departed .contrib-name::after{content:" (departed)";color:var(--faint);font-weight:400;font-size:10.5px}
 
 .snippets{margin-top:10px;background:var(--code-bg);border-radius:7px;padding:10px;display:none}
 .snippets.on{display:block}
@@ -695,12 +699,21 @@ function render(c) {
 
 function confColor(c) { return c==="High"?"green":c==="Med"?"amber":"rose"; }
 
+function scoreTooltip(p) {
+  const b = p.score_breakdown || {};
+  return `score=${p.score ?? 0}\nblame_share=${b.blame_share ?? 0}\nrecency=${b.recency ?? 0}\nauthorship=${b.authorship ?? 0}\nvolume=${b.volume ?? 0}${b.departed ? "\ndeparted=true" : ""}`;
+}
+
+function scorePill(p) {
+  return p.score === undefined ? "" : `<span class="contrib-score" title="${esc(scoreTooltip(p))}">${p.score}</span>`;
+}
+
 function contribOverview(p) {
   return `<div class="contrib-head">
     ${avatar(p)}
     <div class="contrib-meta">
       <div class="contrib-name">${esc(p.name)}</div>
-      <div class="contrib-role">${esc(p.role)} · ${esc(p.when)}</div>
+      <div class="contrib-role">${esc(p.role)}${scorePill(p)} · ${esc(p.when)}</div>
     </div>
   </div>`;
 }
@@ -708,16 +721,16 @@ function contribOverview(p) {
 function contribCard(p,i) {
   const sid = `sn-${i}`;
   const hasSnippets = p.snippets && p.snippets.length;
-  const cardClass = p.status === "departed" ? "contrib-card departed" : "contrib-card";
+  const cls = "contrib-card" + ((p.is_departed || p.status === "departed") ? " departed" : "");
   let badge = "";
-  if (p.status === "departed") badge = `<span class="contrib-badge left">Left Alpaca</span>`;
-  else if (p.still_on_team)    badge = `<span class="contrib-badge team">Current member</span>`;
-  return `<div class="${cardClass}">
+  if (p.status === "departed")    badge = `<span class="contrib-badge left">Left Alpaca</span>`;
+  else if (p.still_on_team)       badge = `<span class="contrib-badge team">Current member</span>`;
+  return `<div class="${cls}">
     <div class="contrib-head">
       ${avatar(p)}
       <div class="contrib-meta">
         <div class="contrib-name">${esc(p.name)}${badge}</div>
-        <div class="contrib-role">${esc(p.role)} · ${esc(p.when)}</div>
+        <div class="contrib-role">${esc(p.role)}${scorePill(p)} · ${esc(p.when)}</div>
       </div>
       <div class="contrib-stats">${p.lines||0} lines</div>
       ${hasSnippets ? `<span class="contrib-toggle" onclick="document.getElementById('${sid}').classList.toggle('on')">show lines</span>` : ""}

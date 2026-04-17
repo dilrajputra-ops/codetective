@@ -52,7 +52,7 @@ def read_file(path: str, max_bytes: int = 1_000_000, max_lines: int = 2000) -> d
 
 def blame(path: str, start: Optional[int] = None, end: Optional[int] = None) -> dict:
     """Return per-author aggregates and per-author code line snippets in the range."""
-    args = ["git", "blame", "--line-porcelain"]
+    args = ["git", "blame", "--line-porcelain", "-w", "-M", "-C"]
     if start and end:
         args += ["-L", f"{start},{end}"]
     args += ["--", path]
@@ -151,3 +151,96 @@ def commit_body(sha: str) -> str:
         return _run(["git", "show", "-s", "--format=%B", sha], timeout=3).strip()
     except subprocess.TimeoutExpired:
         return ""
+
+
+def first_author(path: str) -> dict:
+    """Person who first added the file (for the authorship-bonus signal). Empty dict on failure."""
+    fmt = "%H%x09%an%x09%ae%x09%aI"
+    args = [
+        "git", "log", "--diff-filter=A", "--follow", "--reverse",
+        "-n1", f"--pretty=format:{fmt}", "--", path,
+    ]
+    try:
+        text = _run(args, timeout=4).strip()
+    except subprocess.TimeoutExpired:
+        return {}
+    if not text:
+        return {}
+    parts = text.split("\t")
+    if len(parts) != 4:
+        return {}
+    sha, name, email, date = parts
+    return {"sha": sha, "name": name, "email": email, "date": date}
+
+
+def commits_with_stats(path: str, limit: int = 50) -> list[dict]:
+    """Like log() but with per-commit lines_added/lines_deleted from --numstat.
+
+    Skips merges to avoid double-counting cross-branch noise.
+    """
+    fmt = "%H%x09%an%x09%ae%x09%aI%x09%s"
+    args = [
+        "git", "log", "--follow", "--no-merges", f"-n{limit}",
+        "--numstat", f"--pretty=format:{fmt}", "--", path,
+    ]
+    try:
+        text = _run(args, timeout=8)
+    except subprocess.TimeoutExpired:
+        args = [a for a in args if a != "--follow"]
+        try:
+            text = _run(args, timeout=5)
+        except subprocess.TimeoutExpired:
+            return []
+
+    commits: list[dict] = []
+    cur: Optional[dict] = None
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        if len(line) > 40 and line[40] == "\t" and all(c in "0123456789abcdef" for c in line[:40]):
+            parts = line.split("\t", 4)
+            if len(parts) == 5:
+                sha, author, email, date, subject = parts
+                cur = {
+                    "sha": sha, "author": author, "email": email,
+                    "date": date, "subject": subject,
+                    "lines_added": 0, "lines_deleted": 0, "files_changed": 0,
+                }
+                commits.append(cur)
+            continue
+        if cur is None:
+            continue
+        bits = line.split("\t")
+        if len(bits) < 3:
+            continue
+        try:
+            added = int(bits[0]) if bits[0] != "-" else 0
+            deleted = int(bits[1]) if bits[1] != "-" else 0
+        except ValueError:
+            continue
+        cur["lines_added"] += added
+        cur["lines_deleted"] += deleted
+        cur["files_changed"] += 1
+    return commits
+
+
+_DEPARTED_FILE = Path(__file__).resolve().parent.parent / "departed.txt"
+_departed_cache: Optional[list[str]] = None
+
+
+def read_departed() -> list[str]:
+    """Load case-insensitive substring patterns from departed.txt. Cached per process."""
+    global _departed_cache
+    if _departed_cache is not None:
+        return _departed_cache
+    patterns: list[str] = []
+    try:
+        for raw in _DEPARTED_FILE.read_text(encoding="utf-8").splitlines():
+            s = raw.strip()
+            if not s or s.startswith("#"):
+                continue
+            patterns.append(s.lower())
+    except FileNotFoundError:
+        pass
+    _departed_cache = patterns
+    return patterns

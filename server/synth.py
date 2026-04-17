@@ -4,7 +4,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from . import codeowners, employees, gh_client, git_ops, jira_extract, llm, owners_map, vectors
+from . import (
+    codeowners,
+    employees,
+    expertise,
+    gh_client,
+    git_ops,
+    jira_extract,
+    llm,
+    owners_map,
+    vectors,
+)
 
 PALETTE = ["#6366f1", "#2563eb", "#7c3aed", "#0891b2", "#059669", "#db2777"]
 
@@ -119,13 +129,13 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
         if owners_match["owners"]
         else {}
     )
-    # Build "still on the owning team?" lookup. Match by full name; GH login isn't in blame.
     team_member_names = {
         (m.get("login") or "").lower() for m in (routing.get("members") or [])
     }
-    # Github usernames don't always match git author names, so we also check the
-    # noreply email pattern: 12345+login@users.noreply.github.com
+
     def _still_on_team(name: str, email: str) -> bool:
+        """Match git author against current team members. Tries name fuzzy match
+        then falls back to GitHub noreply email pattern (12345+login@users.noreply.github.com)."""
         if not team_member_names:
             return False
         n = (name or "").lower().replace(" ", "")
@@ -138,25 +148,29 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
                 return True
         return False
 
-    # Contributors: top 5 by blame lines, with deterministic role tags + status.
+    # Contributors: DOK-lite ranking (blame share + recency + authorship + volume - departed),
+    # then layer the authoritative HR/team-membership signals on top of the heuristic role.
     open_pr_authors = {pr["author"] for pr in open_prs if pr.get("author")}
-    top_blame = blame[:5]
+    contributors_scored = expertise.score_contributors(
+        blame_authors=blame,
+        commits_with_stats=git_ops.commits_with_stats(path, limit=50),
+        first_author=git_ops.first_author(path),
+        departed_patterns=git_ops.read_departed(),
+        open_pr_authors=open_pr_authors,
+        now=datetime.now(timezone.utc),
+    )
     contributors = []
-    for i, b in enumerate(top_blame):
-        name = b["name"]
-        email = b.get("email", "")
+    for i, c in enumerate(contributors_scored[:5]):
+        name = c["name"]
+        email = c.get("email", "")
         emp_status = employees.status(name, email)
         on_team = _still_on_team(name, email)
         if emp_status == "departed":
             role = "Left Alpaca"
         elif on_team:
             role = f"Current {routing.get('team_name','team')} member"
-        elif name in open_pr_authors:
-            role = "Open PR owner"
-        elif i == 0:
-            role = "Largest blame share"
         else:
-            role = "Recent committer"
+            role = c["role"]
         key = email or name
         contributors.append(
             {
@@ -165,8 +179,11 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
                 "initials": _initials(name),
                 "color": PALETTE[i % len(PALETTE)],
                 "role": role,
-                "when": _ago(b["last_date"]),
-                "lines": b["lines"],
+                "when": _ago(c["last_active"]),
+                "lines": c["lines"],
+                "score": round(c["score"], 2),
+                "score_breakdown": c["score_breakdown"],
+                "is_departed": c.get("is_departed", False) or emp_status == "departed",
                 "snippets": blame_lines.get(key, [])[:5],
                 "status": emp_status,           # active | departed | unknown
                 "still_on_team": on_team,
@@ -199,12 +216,12 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
         "jira": jira_ids[:3],
         "top_contributors": [
             {
-                "name": b["name"],
-                "lines": b["lines"],
+                "name": c["name"],
+                "lines": c["lines"],
                 "status": contributors[i]["status"],
                 "still_on_team": contributors[i]["still_on_team"],
             }
-            for i, b in enumerate(top_blame)
+            for i, c in enumerate(contributors_scored[:5])
         ],
         "current_team_members": [
             (m.get("login") or "")
