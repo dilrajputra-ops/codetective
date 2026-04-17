@@ -404,6 +404,11 @@ def investigate_stream(path: str, range_str: Optional[str]):
                     jira_sources.append({"text": body, "where": f"commit {sha[:7]} body"})
         jira_ids = jira_extract.extract(jira_sources)
 
+        # Kick off Jira ticket-body fetches NOW so they run in parallel with
+        # the LLM file_head read + prompt assembly (saves ~3s cold). Resolved
+        # later in the narrative stage. Daemon-style: never blocks if acli hangs.
+        f_jira_tickets = ex.submit(jira_client.fetch_many, [j["id"] for j in jira_ids[:3]])
+
         open_pr = open_prs[0] if open_prs else None
 
         # Re-rank contributors with the open-PR-author signal layered in.
@@ -516,10 +521,12 @@ def investigate_stream(path: str, range_str: Optional[str]):
     except Exception:
         pass
 
-    # Fetch Jira ticket bodies for the top extracted IDs. Descriptions are where
-    # business intent actually lives ("why are we building this for partner X,
-    # what regulatory constraint applies"). Parallel, cached 24h.
-    jira_tickets = jira_client.fetch_many([j["id"] for j in jira_ids[:3]])
+    # Pick up the Jira fetches kicked off back in the github stage. By now
+    # they're usually done (parallel with PR fan-out + file_head read).
+    try:
+        jira_tickets = f_jira_tickets.result(timeout=10)
+    except Exception:
+        jira_tickets = []
 
     llm_signals = {
         "path": path,

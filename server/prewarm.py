@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 import threading
 
-from . import gh_client, recent
+from . import gh_client, llm, recent
 from .config import MERGED_WINDOWS_DAYS, PREWARM_TOP_N
 
 
@@ -36,7 +36,19 @@ def _warm_loop() -> None:
     print(f"[prewarm] done", file=sys.stderr)
 
 
+def _warm_llm() -> None:
+    """Force-load the Ollama model so the first user investigation doesn't
+    eat the 25-30s cold load. Daemon thread; failure is silent (LLM is optional)."""
+    try:
+        ok = llm.warmup()
+        print(f"[prewarm] llm warmup: {'ready' if ok else 'unreachable'}", file=sys.stderr)
+    except Exception as e:
+        print(f"[prewarm] llm warmup error: {e!r}", file=sys.stderr)
+
+
 def kick_off() -> None:
     """Fire-and-forget prewarm in a daemon thread."""
-    t = threading.Thread(target=_warm_loop, name="prewarm", daemon=True)
+    t = threading.Thread(target=_warm_loop, name="prewarm-gh", daemon=True)
     t.start()
+    t2 = threading.Thread(target=_warm_llm, name="prewarm-llm", daemon=True)
+    t2.start()

@@ -188,15 +188,29 @@ def _fallback(signals: dict) -> dict:
 
 
 def _ollama_chat(messages: list[dict], timeout: float = 90.0) -> str | None:
-    # 90s headroom: 7B-class models can take ~30-40s cold with the larger code-context
-    # prompt (file_head + commit bodies). Warm calls finish in ~10-15s; cache hides repeats.
+    # 90s headroom for cold + generation. Warm calls on Metal finish in ~10-15s.
+    # keep_alive=30m: default 5min idle unload causes 25s+ cold reloads.
+    # num_ctx=8192: critical on small-RAM machines (16GB M-series). Default 32K
+    # ctx requires ~5GB of KV cache on the GPU, which on top of a 5GB model
+    # exceeds the VRAM budget — Ollama silently falls back to 100% CPU
+    # (3-4x slower). Our prompts are ~3-5K tokens, so 8K is plenty.
     body = json.dumps(
         {
             "model": OLLAMA_MODEL,
             "messages": messages,
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0.2, "num_predict": 600},
+            "keep_alive": "30m",
+            "options": {
+                "temperature": 0.2,
+                "num_predict": 600,
+                "num_ctx": 8192,
+                # Force max GPU offload. Without this, Ollama's scheduler
+                # conservatively picks GPULayers=0 on low-free-RAM machines
+                # (16GB with IDE open) even though Metal VRAM has 12GB free.
+                # 999 means "all layers"; Ollama clamps to the actual count.
+                "num_gpu": 999,
+            },
         }
     ).encode()
     req = urllib.request.Request(
@@ -211,6 +225,35 @@ def _ollama_chat(messages: list[dict], timeout: float = 90.0) -> str | None:
             return (data.get("message") or {}).get("content")
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
         return None
+
+
+def warmup() -> bool:
+    """Force-load the model into Ollama memory with a no-op generate.
+    Called from server startup so the first user investigation doesn't pay
+    the 25-30s cold load penalty. Non-blocking: caller should run in a thread.
+    Returns True if model is loaded and responsive.
+    """
+    body = json.dumps({
+        "model": OLLAMA_MODEL,
+        "prompt": "",
+        "stream": False,
+        "keep_alive": "30m",
+        # Config MUST match _ollama_chat — mismatches force a full model reload
+        # on the first real request (wasting the warmup entirely).
+        "options": {"num_ctx": 8192, "num_gpu": 999},
+    }).encode()
+    req = urllib.request.Request(
+        f"{OLLAMA_HOST}/api/generate",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            resp.read()
+            return True
+    except (urllib.error.URLError, TimeoutError):
+        return False
 
 
 def _cache_key(signals: dict) -> str:
