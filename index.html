@@ -257,6 +257,9 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   padding:2px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
 .contrib-badge.left{background:#fee2e2;color:#991b1b}
 .contrib-badge.team{background:var(--green-bg);color:var(--green)}
+.gh-handle{font-size:11.5px;font-weight:500;color:var(--dim);text-decoration:none;margin-left:6px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.gh-handle:hover{color:var(--ink);text-decoration:underline}
 .av-wrap{position:relative;flex-shrink:0}
 .av-dot{position:absolute;bottom:-1px;right:-1px;width:11px;height:11px;border-radius:50%;
   background:var(--green);border:2px solid var(--surface)}
@@ -401,7 +404,7 @@ const state = {
 // entries from older schemas get evicted on next page load.
 const CACHE_MAX = 50;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const CACHE_SCHEMA = 3;  // v3: replaced codePurpose/recentContext with purpose + decisions[{claim,evidence}]
+const CACHE_SCHEMA = 4;  // v4: added github + github_url to contributors
 const IDB_NAME = "codetective", IDB_VER = 1, IDB_STORE = "cases";
 
 function _idbOpen() {
@@ -1546,11 +1549,17 @@ function scorePill(p) {
   return p.score === undefined ? "" : `<span class="contrib-score" title="${esc(scoreTooltip(p))}">${p.score}</span>`;
 }
 
+function ghHandle(p) {
+  if (!p.github) return "";
+  const url = p.github_url || `https://github.com/${p.github}`;
+  return ` <a class="gh-handle" href="${esc(url)}" target="_blank" rel="noopener" title="GitHub profile" onclick="event.stopPropagation()">@${esc(p.github)}</a>`;
+}
+
 function contribOverview(p) {
   return `<div class="contrib-head">
     ${avatar(p)}
     <div class="contrib-meta">
-      <div class="contrib-name">${esc(p.name)}</div>
+      <div class="contrib-name">${esc(p.name)}${ghHandle(p)}</div>
       <div class="contrib-role">${esc(p.role)}${scorePill(p)} · ${esc(p.when)}</div>
     </div>
   </div>`;
@@ -1565,7 +1574,7 @@ function contribCard(p,i) {
     <div class="contrib-head">
       ${avatar(p)}
       <div class="contrib-meta">
-        <div class="contrib-name">${esc(p.name)}${badge}</div>
+        <div class="contrib-name">${esc(p.name)}${ghHandle(p)}${badge}</div>
         <div class="contrib-role">${esc(p.role)}${scorePill(p)} · ${esc(p.when)}</div>
       </div>
       <div class="contrib-stats">${p.lines||0} lines</div>

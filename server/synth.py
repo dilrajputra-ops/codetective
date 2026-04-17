@@ -11,6 +11,34 @@ import hashlib
 
 PR_NUMBER_RE = re.compile(r"\(#(\d+)\)\s*$")
 
+# GitHub noreply emails encode the login. Two formats coexist:
+#   <id>+<login>@users.noreply.github.com   (modern, default since 2017)
+#   <login>@users.noreply.github.com        (legacy)
+GH_NOREPLY_RE = re.compile(r"^(?:\d+\+)?([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))@users\.noreply\.github\.com$")
+
+
+def _github_login(email: str, name: str, team_members: list[dict]) -> str:
+    """Best-effort extract a GitHub login. Empty string if we can't be sure."""
+    em = (email or "").strip().lower()
+    if em:
+        m = GH_NOREPLY_RE.match(em)
+        if m:
+            return m.group(1)
+    # Fallback: fuzzy-match the display name against team members from the GH
+    # Teams API. Only used when we already have the team roster — avoids any
+    # extra network calls.
+    if not name or not team_members:
+        return ""
+    n = name.lower().replace(" ", "").replace("-", "").replace(".", "")
+    for m in team_members:
+        login = (m.get("login") or "").lower()
+        member_name = (m.get("name") or "").lower().replace(" ", "").replace("-", "").replace(".", "")
+        if login and (login in n or n in login):
+            return m["login"]
+        if member_name and member_name == n:
+            return m["login"]
+    return ""
+
 
 def _pr_number(subject: str) -> Optional[int]:
     """Extract trailing `(#NNNN)` PR number from a squash-merge commit subject."""
@@ -143,6 +171,7 @@ def _build_contributors(
         now=datetime.now(timezone.utc),
     )
     contributors = []
+    team_members = routing.get("members") or []
     for i, c in enumerate(scored[:5]):
         name = c["name"]
         email = c.get("email", "")
@@ -154,11 +183,13 @@ def _build_contributors(
             role = f"Current {routing.get('team_name', 'team')} member"
         else:
             role = c["role"]
-        key = email or name
+        gh_login = _github_login(email, name, team_members)
         contributors.append(
             {
                 "name": name,
                 "email": email,
+                "github": gh_login,
+                "github_url": f"https://github.com/{gh_login}" if gh_login else "",
                 "initials": _initials(name),
                 "color": PALETTE[i % len(PALETTE)],
                 "role": role,
