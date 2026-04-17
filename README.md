@@ -1,186 +1,140 @@
 # Codetective
 
-A small local tool that answers "who owns this code, who's actively touching it, and what's in flight against it?" Paste a path, get a single screen with the team, top contributors, recent commits, open PRs, and any related Jira ticket — in under three seconds.
+A local tool that answers *"who owns this code, who's actively touching it, and what's in flight against it?"*
 
-Built for the on-call moment when you've been paged on code you've never seen and need to know who to escalate to before the first paragraph of the runbook.
+Paste a path, PR number, or contributor name — get the team, top experts, recent commits, open PRs, related Jira tickets, and an LLM-authored code-context narrative. One screen, under three seconds, nothing leaves the machine.
 
-## What it answers
+Built for the on-call moment when you've been paged on code you've never seen.
 
-| Question | Source |
-|---|---|
-| Which team owns this? | `.github/CODEOWNERS` (with parent-directory inference) |
-| Who actually wrote this code? | `git blame -w -M -C` (whitespace + move-corrected) |
-| Who's still on the team? | GitHub org membership via `gh` CLI |
-| Who has likely left? | `departed.txt` (project-local) |
-| Who knows it best, ranked? | DOK-lite scoring (see below) |
-| What's in flight on it? | `gh api search/issues` for open PRs touching the path |
-| Which Jira ticket explains the state? | Regex `\b[A-Z]{2,8}-\d+\b` over PR titles, branches, commit subjects/bodies |
-| What does it look like in plain English? | One local Ollama call, JSON-mode, 5s timeout, templated fallback |
+![Codetective path mode](static/icon-192.png)
 
-## What it deliberately does NOT do
+---
 
-- No cloud LLM, no cloud embeddings. **Nothing leaves the machine.** This is by design — the tool reads proprietary repo metadata (paths, author names, commit subjects, internal Jira IDs) and is meant to stay there.
-- No chatbot, no NL Q&A. Paste a path, get a result. One screen, one input.
-- No multi-repo. Single repo target via `GOBROKER_PATH`.
-- No frontend framework. Single static `index.html` + vanilla JS + `fetch()`.
-- No tests beyond a smoke script.
+## Modes
 
-See [AGENTS.md](AGENTS.md) for the full scope guardrails.
+| Mode | Input | What you get |
+|---|---|---|
+| **Path** | `rest/api/binder/binder.go` | Team, contributors, timeline, open/merged PRs, Jira context, LLM narrative, code preview, similar files |
+| **PR** | `9764`, `LPCD-1560`, or a GitHub PR URL | Recommended reviewers (DOK-scored across all changed files), cross-team/conflict/stale risk flags, per-reviewer verdicts, changed-files drill-in |
+| **Contributors** | `/contributors` | Org-wide directory grouped by team, activity badges, lazy-loaded LLM engineer profiles |
+| **Snippet finder** | Any pasted code | `git grep` → path + line range. Bottom-bar shortcut: `⇧⌘F` |
 
-## How the contributor ranking works (DOK-lite)
+---
 
-Adapted from Fritz et al. 2014 ([Degree-of-Knowledge: Modeling a developer's knowledge of code](https://dl.acm.org/doi/10.1145/2512207)), minus the IDE-interaction term we don't have signal for:
+## Guardrails
 
-```
-score(person) =
-    blame_share        * 1.0    # primary signal (whitespace/move-corrected)
-  + recency_term       * 1.5    # 6-month half-life, capped at 3.0
-  + authorship_bonus   * 0.8    # +1 if first author of the file
-  + change_volume      * 0.5    # log10(1 + non-trivial lines added)
-  - departed_penalty   * 5.0    # effectively zeroes out departed contributors
-```
+These are **hard constraints**. Reject PRs that break them.
 
-All weights are tunable constants at the top of [server/expertise.py](server/expertise.py). The `score_breakdown` is returned alongside each contributor so the UI can show "why this person ranked here" on hover — no magic.
+1. **LOCAL ONLY.** No cloud LLM, no cloud embeddings, no hosted APIs beyond the ones that already own your data (GitHub, Jira). The tool reads proprietary repo metadata — paths, author names, commit subjects, internal Jira IDs, file contents that go into LLM prompts — and **nothing leaves the machine except to your existing GitHub/Jira accounts**. No OpenAI. No Anthropic. No hosted Llama. If Ollama is down, the LLM features degrade to empty — they never fall back to a cloud model.
 
-The role label is layered on top: if `employees.status() == "departed"` the label becomes "Left Alpaca"; if the person is a current member of the owning team (matched via GitHub login, with fallback to the `noreply` email pattern) the label becomes "Current <Team> member"; otherwise the DOK-derived label ("Created the file" / "Active contributor" / "Historical author") wins.
+2. **Deterministic-first, LLM-last.** Every factual claim on the page comes from `git`, `gh`, `acli`, or CODEOWNERS. The LLM only writes prose to *explain* those facts — it never invents them. Unreachable Ollama = blank narrative card, not hallucinated filler.
+
+3. **No chatbot.** Paste an input, get one full result screen. No conversation turns, no back-and-forth. The UI is a dashboard, not an assistant.
+
+4. **One repo at a time.** Configured via `GOBROKER_PATH`. Cross-repo lookups would require topology we deliberately don't maintain.
+
+5. **No frontend framework.** Single-file `index.html` + vanilla JS + `fetch()`. No build step, no bundler, no lock-in. If you need to read the client code, it's right there.
+
+6. **Degradation is a visible feature, not a silent failure.** When `gh` rate-limits, Ollama is offline, or a file is missing from the checkout, the UI shows *which* source degraded and keeps rendering the rest. Never a blank screen.
+
+7. **Small modules.** Every `server/*.py` module stays under ~200 lines and owns one clear concern. If a module is growing, it's a sign it should split.
+
+Full context lives in [`AGENTS.md`](AGENTS.md).
+
+---
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| **Backend** | Python 3.13 + FastAPI + Uvicorn | One-file routes, SSE for progressive rendering, no async ceremony |
+| **Local LLM** | [Ollama](https://ollama.com) running `qwen2.5-coder:3b` | Small, fast (~3-5s narratives), great on an M-series Mac. Model swappable via env. |
+| **Local embeddings** | Ollama running `nomic-embed-text` | 768-dim, CPU-friendly, used for the path similarity rail |
+| **Vector store** | SQLite with a brute-force cosine query | 12k paths fits in memory; no need for Faiss/pgvector |
+| **Git** | `git` subprocess (`blame -w -M -C`, `log --follow`, `log --numstat`, `grep`, `shortlog`) | Move/whitespace-corrected blame is the single most important signal |
+| **GitHub** | `gh` CLI + GraphQL for org roster/teams | Uses your existing `gh auth`, no PAT management |
+| **Jira** | Atlassian `acli` | Ticket body text feeds the LLM prompt for business-intent grounding |
+| **CODEOWNERS** | `wcmatch` globbing + parent-directory inference | Handles the `*` and `/path/**/` patterns GitHub supports |
+| **Frontend** | Single `index.html`, vanilla JS, SSE streaming, IndexedDB cache | Progressive per-card rendering; stages (shell → contributors → github → narrative) paint as they complete |
+| **Caches** | On-disk JSON in `/tmp/codemap-cache/` with TTLs per source | 10min for `gh`, 24h for Jira and LLM, 7d for GitHub roster |
+
+The only Python runtime deps are `fastapi`, `uvicorn`, `wcmatch`, and `python-dotenv` (see [requirements.txt](requirements.txt)).
+
+---
 
 ## Architecture
 
 ```
-                  +------------+
-   path  ---->    |  /         |  --> serves index.html
-                  |  /file     |  --> raw file content for the visual range picker
-                  |  /paths    |  --> autocomplete list (cached git ls-files)
-                  |  /investigate -> the case dict the UI renders
-                  |  /reindex  |  --> rebuilds the path vector index
-                  |  /health   |
-                  +-----+------+
-                        | (FastAPI on :8765)
-        +---------------+----------------+--------------+--------------+
-        |               |                |              |              |
-   git_ops          codeowners      gh_client      expertise       llm
-   (blame/log/      (CODEOWNERS    (open PRs,    (DOK-lite      (Ollama,
-    stats/first    parser, parent  on-disk        contributor     5s timeout,
-    author)        inference)     cached)         scoring)        JSON mode,
-                                                                   templated
-                                                                   fallback)
-        |
-   employees + owners_map + gh_teams + slack_lookup
-   (HR/team membership, slack channel routing,
-    departed lookup with mtime-cached departed.txt)
+            +-----------------+
+ path  ---> |  /investigate   |  --> stages (SSE): shell -> contributors -> github -> narrative
+ pr   ---> |  /pr/{ident}    |  --> aggregated PR triage dict (reviewers + risk + conflicts + teams)
+ query ---> |  /find          |  --> snippet search via git grep
+            +--------+--------+
+                     | FastAPI on :8765
+    +----------------+-----------------+----------------+
+    |                |                 |                |
+ git_ops        codeowners         gh_client        llm / embeddings
+ (blame/log/   (parser + parent   (gh CLI cache    (Ollama only;
+  stats/IO)     inference)         + rate-limit)    deterministic fallback)
+    |                |                 |                |
+    +----------------+-----------------+----------------+
+                              |
+          expertise (DOK-lite) + employees + owners_map +
+          gh_teams + gh_roster + jira_client + snippet_search
 ```
 
-Each module is small (<150 lines). All shellouts have explicit timeouts and never use `shell=True`. All git/gh paths must resolve under `GOBROKER_PATH` or the request gets a 400/404.
+Every shellout has an explicit timeout and never uses `shell=True`. Every path must resolve under `GOBROKER_PATH` or the request 404s.
+
+---
 
 ## Setup
 
 Requires Python 3.13+ and macOS or Linux.
 
-### 1. Install local services
-
 ```bash
+# 1. Install local services
 brew install --cask ollama
 brew install gh
-ollama pull llama3.2:3b nomic-embed-text
-gh auth login            # needs `repo` and `read:org` scopes
-```
+ollama pull qwen2.5-coder:3b nomic-embed-text
+gh auth login                  # needs `repo` + `read:org` scopes
 
-### 2. Clone the target repo
-
-Anywhere on disk. Just point at it via `GOBROKER_PATH` in `.env`.
-
-### 3. Install Python deps
-
-```bash
+# 2. Python deps
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+
+# 3. Configure
+cp .env.example .env
+# edit GOBROKER_PATH, GH_REPO, GH_ORG
+
+# 4. Run
+uvicorn server.main:app --host 127.0.0.1 --port 8765
 ```
 
-### 4. Configure
+Open http://127.0.0.1:8765.
 
-Copy `.env.example` to `.env` and fill in:
+Optional project-local data:
+- [`departed.txt`](departed.txt) — one substring per line matching a departed contributor's name or email. Zeroes out their DOK score.
+- [`owners.json`](owners.json) — CODEOWNERS slug → routing overrides (on-call, escalation, docs). Auto-fetched fields (team members, Slack channels) come from `gh_teams` and `slack_channels.json`.
 
-```
-GOBROKER_PATH=/path/to/your/repo/clone
-GH_REPO=alpacahq/gobroker
-GH_ORG=alpacahq
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=llama3.2:3b
-OLLAMA_EMBED_MODEL=nomic-embed-text
-VECTOR_DB=/tmp/codemap-vectors.sqlite
-```
+---
 
-### 5. Optional: project-local data
-
-- [departed.txt](departed.txt) — one substring per line that matches a departed contributor's name or email. Case-insensitive. Lines starting with `#` are ignored.
-- [owners.json](owners.json) — CODEOWNERS team slug → routing info (slack, on-call, escalation, docs). Fields are all optional; missing ones just don't render.
-- [slack_channels.json](slack_channels.json) — generated cache of CODEOWNERS slug → Slack channel mapping.
-
-## Run
-
-```bash
-source venv/bin/activate
-uvicorn server.main:app --host 127.0.0.1 --port 8765 --reload
-```
-
-Open http://127.0.0.1:8765 and paste a repo-relative path.
-
-## Smoke test
-
-After any change to the contributor scoring or git plumbing:
-
-```bash
-python scripts/smoke_expertise.py path1 path2 path3
-# or, no args = auto-pick 3 random paths from the target repo
-python scripts/smoke_expertise.py
-```
-
-Prints contributors with score breakdown, sanity-checks ordering and departed handling.
-
-## Privacy posture (read this if you're considering deploying it for someone else)
+## Privacy posture
 
 Codetective reads:
-- file paths from a private repo
-- author names and email addresses from git blame and git log
+- file paths and contents from a private repo
+- author names and emails from `git blame` / `log`
 - commit subjects and bodies
-- PR titles, branches, and authors via the GitHub API (under your `gh` auth)
-- Jira IDs extracted from the above
+- PR titles, branches, authors via the GitHub API (your `gh` auth)
+- Jira ticket bodies via `acli` (your Atlassian auth)
 
 It sends:
-- nothing to any cloud service
-- one local HTTP request per investigation to `OLLAMA_HOST` (default `localhost:11434`) with the above signals as JSON
+- **nothing to any cloud LLM or embedding service**
+- local HTTP calls to `OLLAMA_HOST` (default `localhost:11434`) with file snippets, commit messages, and Jira bodies as prompt context
 
-If you swap the Ollama host for a hosted endpoint, you've defeated the design. There is no API-key auth in this project on purpose — there's nothing to authenticate to.
+If you swap Ollama for a hosted endpoint, you've defeated the design. There is no API-key auth in this project on purpose — there's nothing to authenticate to.
 
-## Repo layout
-
-```
-server/
-  main.py            # FastAPI app, route definitions
-  config.py          # env vars, paths
-  synth.py           # combines all signals into the CASE dict the UI renders
-  git_ops.py         # blame, log, log --numstat, first_author, file IO
-  codeowners.py      # CODEOWNERS parser + parent-directory inference
-  gh_client.py       # open PR lookup via `gh` CLI, on-disk caching
-  expertise.py       # DOK-lite contributor scoring
-  employees.py       # mtime-cached departed.txt lookup
-  owners_map.py      # CODEOWNERS slug -> routing dict (slack, on-call, etc.)
-  gh_teams.py        # GitHub org team membership fetcher (cached)
-  slack_lookup.py    # slack channel resolution helpers
-  jira_extract.py    # regex extraction + dedup of Jira IDs
-  llm.py             # Ollama call, JSON mode, templated fallback
-  vectors.py         # SQLite path-embedding cache + brute-force cosine
-  paths_index.py     # cached `git ls-files` for autocomplete
-
-index.html           # single-file UI (vanilla JS, no build step)
-scripts/
-  smoke_expertise.py # contributor ranking smoke test
-
-owners.json          # team routing
-departed.txt         # known-departed contributors
-slack_channels.json  # team slug -> slack channel cache
-```
+---
 
 ## License
 
