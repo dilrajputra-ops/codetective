@@ -4,7 +4,7 @@ A local tool that answers *"who owns this code, who's actively touching it, and 
 
 Paste a path, PR number, or contributor name — get the team, top experts, recent commits, open PRs, related Jira tickets, and an LLM-authored code-context narrative. One screen, under three seconds, nothing leaves the machine.
 
-Built for the on-call moment when you've been paged on code you've never seen.
+Built for the moment you're assigned to — or just trying to understand — an area of the codebase you've never touched before.
 
 ![Codetective path mode](static/icon-192.png)
 
