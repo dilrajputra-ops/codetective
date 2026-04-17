@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from . import codeowners, gh_client, git_ops, jira_extract, llm, vectors
+from . import codeowners, expertise, gh_client, git_ops, jira_extract, llm, vectors
 
 PALETTE = ["#6366f1", "#2563eb", "#7c3aed", "#0891b2", "#059669", "#db2777"]
 
@@ -113,28 +113,32 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
     else:
         confidence = _confidence(owners_match["owners"], commits_30d)
 
-    # Contributors: top 3 by blame lines, with deterministic role tags
+    # Contributors: ranked by DOK-lite score (blame share + recency + authorship + volume,
+    # minus departed penalty). See server/expertise.py.
     open_pr_authors = {pr["author"] for pr in open_prs if pr.get("author")}
-    top_blame = blame[:5]
+    contributors_scored = expertise.score_contributors(
+        blame_authors=blame,
+        commits_with_stats=git_ops.commits_with_stats(path, limit=50),
+        first_author=git_ops.first_author(path),
+        departed_patterns=git_ops.read_departed(),
+        open_pr_authors=open_pr_authors,
+        now=datetime.now(timezone.utc),
+    )
     contributors = []
-    for i, b in enumerate(top_blame):
-        name = b["name"]
-        if name in open_pr_authors:
-            role = "Open PR owner"
-        elif i == 0:
-            role = "Largest blame share"
-        else:
-            role = "Recent committer"
-        key = b.get("email") or name
+    for i, c in enumerate(contributors_scored[:5]):
+        key = c.get("email") or c["name"]
         contributors.append(
             {
-                "name": name,
-                "email": b.get("email", ""),
-                "initials": _initials(name),
+                "name": c["name"],
+                "email": c.get("email", ""),
+                "initials": _initials(c["name"]),
                 "color": PALETTE[i % len(PALETTE)],
-                "role": role,
-                "when": _ago(b["last_date"]),
-                "lines": b["lines"],
+                "role": c["role"],
+                "when": _ago(c["last_active"]),
+                "lines": c["lines"],
+                "score": round(c["score"], 2),
+                "score_breakdown": c["score_breakdown"],
+                "is_departed": c.get("is_departed", False),
                 "snippets": blame_lines.get(key, [])[:5],
             }
         )
