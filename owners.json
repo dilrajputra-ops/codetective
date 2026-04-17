@@ -1,0 +1,96 @@
+{
+  "_doc": "Codemap routing map: CODEOWNERS team slug -> human routing info. Fill in what you know; missing/empty fields just won't render. Required: nothing. Recommended: team_name, slack.",
+
+  "@alpacahq/admin": {
+    "team_name": "Admin",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/applications": {
+    "team_name": "Applications",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/clearing": {
+    "team_name": "Clearing",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/crypto": {
+    "team_name": "Crypto",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/devops": {
+    "team_name": "DevOps",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/gobroker-db-reviewer": {
+    "team_name": "Gobroker DB Reviewer",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": "",
+    "note": "Review-only group, not a service owner."
+  },
+  "@alpacahq/identity": {
+    "team_name": "Identity",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/ledger": {
+    "team_name": "Ledger",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/market-data": {
+    "team_name": "Market Data",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/payments": {
+    "team_name": "Payments",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/platform-api": {
+    "team_name": "Platform API",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/tax": {
+    "team_name": "Tax",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  },
+  "@alpacahq/trading": {
+    "team_name": "Trading",
+    "slack": "",
+    "on_call": "",
+    "escalation": "",
+    "docs": ""
+  }
+}

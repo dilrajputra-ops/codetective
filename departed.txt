@@ -1,0 +1,12 @@
+# Codemap: known-departed contributors.
+# One match per line. Lookup is case-insensitive substring match against
+# both the git author NAME and EMAIL of each blame contributor.
+#
+# Examples:
+#   john doe                   ← matches name
+#   jdoe@                      ← matches email prefix
+#   @oldcompany.com            ← matches everyone with this old domain
+#
+# Lines starting with # are ignored. Empty lines ignored.
+
+# --- fill in ---
