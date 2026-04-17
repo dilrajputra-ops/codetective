@@ -1,17 +1,30 @@
-/* Floating snippet finder — paste any code, get back path + line range. */
-.sf-fab{position:fixed;bottom:20px;right:20px;z-index:9999;
+/* Floating snippet finder — bottom-center bar that reads as an input.
+ * Click anywhere on the bar to open the paste modal. The bar itself is
+ * the trigger; the modal does the actual work, identical to before. */
+.sf-fab{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:9999;
+  background:rgba(24,28,31,.92);
+  color:rgba(255,255,255,.78);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:999px;padding:0 6px 0 18px;height:46px;width:min(520px,calc(100% - 40px));
+  font:inherit;font-size:13px;cursor:pointer;
+  display:flex;align-items:center;gap:12px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:0 4px 12px rgba(0,0,0,.18),0 12px 36px rgba(0,0,0,.22),0 0 0 1px rgba(0,0,0,.04);
+  transition:transform .14s,box-shadow .14s,border-color .14s}
+.sf-fab:hover{transform:translateX(-50%) translateY(-1px);border-color:rgba(255,212,0,.4);
+  box-shadow:0 6px 16px rgba(0,0,0,.22),0 16px 44px rgba(184,132,26,.18),0 0 0 1px rgba(0,0,0,.04)}
+.sf-fab:active{transform:translateX(-50%) translateY(0)}
+.sf-fab .sf-icon{flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(180deg,var(--alpaca-yellow,#FFD400) 0%,#F5C800 100%);
-  color:var(--text,#181c1f);
-  border:none;border-radius:24px;padding:11px 18px;font-size:13px;font-weight:700;
-  cursor:pointer;display:flex;align-items:center;gap:8px;
-  box-shadow:0 2px 4px rgba(0,0,0,.06),0 6px 16px rgba(184,132,26,.32);
-  transition:transform .12s,box-shadow .12s}
-.sf-fab:hover{transform:translateY(-2px);
-  box-shadow:0 3px 6px rgba(0,0,0,.08),0 10px 20px rgba(184,132,26,.4)}
-.sf-fab:active{transform:translateY(0)}
-.sf-fab .sf-icon{font-size:14px;line-height:1}
-.sf-fab .sf-kbd{font-size:10px;font-weight:600;background:rgba(0,0,0,.12);
-  padding:1px 6px;border-radius:4px;font-family:"SF Mono",ui-monospace,monospace}
+  border-radius:50%;color:#181c1f;font-size:11px;font-weight:800;
+  box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.sf-fab .sf-label{flex:1;text-align:left;font-weight:500;letter-spacing:.005em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sf-fab .sf-label b{color:#fff;font-weight:600}
+.sf-fab .sf-kbd{flex-shrink:0;font-size:10.5px;font-weight:600;
+  color:rgba(255,255,255,.7);background:rgba(255,255,255,.08);
+  padding:3px 8px;border-radius:6px;font-family:"SF Mono",ui-monospace,monospace;
+  border:1px solid rgba(255,255,255,.06)}
 
 .sf-overlay{position:fixed;inset:0;background:rgba(15,16,20,.45);z-index:10000;
   display:none;align-items:flex-start;justify-content:center;padding:80px 20px 20px;

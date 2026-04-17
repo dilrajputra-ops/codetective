@@ -11,8 +11,8 @@
 
   const tpl = `
     <button class="sf-fab" id="sf-fab" title="Paste a code snippet to find it (⇧⌘F)">
-      <span class="sf-icon">🔎</span>
-      <span>Find snippet</span>
+      <span class="sf-icon" aria-hidden="true">⌕</span>
+      <span class="sf-label"><b>Find snippet</b> in gobroker — paste any code…</span>
       <span class="sf-kbd">⇧⌘F</span>
     </button>
     <div class="sf-overlay" id="sf-overlay" role="dialog" aria-hidden="true">
