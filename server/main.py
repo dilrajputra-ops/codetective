@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import contributor_summary, contributors as contributors_mod
@@ -15,6 +16,12 @@ from .config import GOBROKER_PATH, GH_REPO, OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_EM
 app = FastAPI(title="Codemap")
 
 ROOT = Path(__file__).resolve().parents[1]
+app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse(ROOT / "static" / "favicon-32.png")
 
 
 @app.on_event("startup")

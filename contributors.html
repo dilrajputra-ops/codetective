@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Alpaca Codemap — Contributors</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
 <style>
 :root{
   --bg:#f7f8fa; --surface:#fff; --border:#e5e7eb; --border-strong:#d1d5db;
@@ -21,8 +24,8 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 /* ===== Top bar ===== */
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);
   padding:14px 32px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:5}
-.logo{width:28px;height:28px;border-radius:6px;background:var(--accent);color:#fff;
-  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.logo{width:30px;height:30px;border-radius:7px;display:block;object-fit:cover;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);background:#fff}
 .brand-name{font-weight:700;letter-spacing:-.01em;font-size:15px}
 .topbar .crumbs{color:var(--faint);font-size:12px;margin-left:8px}
 .topbar .crumbs a{color:var(--dim)}
@@ -185,7 +188,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 <body>
 
 <div class="topbar">
-  <div class="logo">CM</div>
+  <img class="logo" src="/static/icon-192.png" alt="Codemap">
   <div class="brand-name">Codemap</div>
   <div class="crumbs"><a href="/">Investigate</a> · <span id="crumb-current">Contributors</span></div>
   <div class="spacer"></div>

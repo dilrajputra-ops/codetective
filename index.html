@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Alpaca Codemap</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
 <style>
 :root{
   --bg:#f7f8fa; --surface:#fff; --border:#e5e7eb; --border-strong:#d1d5db;
@@ -27,8 +30,8 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .rail{border-right:1px solid var(--border);background:var(--surface);
   display:flex;flex-direction:column;overflow:hidden}
 .rail-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.logo{width:24px;height:24px;border-radius:6px;background:var(--accent);color:#fff;
-  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.logo{width:26px;height:26px;border-radius:6px;display:block;object-fit:cover;
+  box-shadow:0 1px 2px rgba(0,0,0,.08);background:#fff}
 .brand-name{font-weight:700;letter-spacing:-.01em;font-size:14px}
 .tag{margin-left:auto;font-size:10px;font-weight:600;color:var(--faint);
   border:1px solid var(--border);border-radius:5px;padding:2px 7px}
@@ -338,7 +341,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 
 <aside class="rail">
   <div class="rail-head">
-    <div class="logo">C</div>
+    <img class="logo" src="/static/icon-192.png" alt="Codemap">
     <span class="brand-name">Codemap</span>
     <span class="tag">gobroker</span>
   </div>
