@@ -16,6 +16,11 @@ OLLAMA_EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 CACHE_DIR = Path("/tmp/codemap-cache")
 CACHE_TTL_SECONDS = 600
+# Merged PRs are immutable history — cache much longer than open PRs.
+MERGED_PR_TTL_SECONDS = int(os.environ.get("MERGED_PR_TTL_SECONDS", str(3600)))
+# Recently-investigated paths (for startup prewarm).
+RECENT_PATHS_FILE = Path(os.environ.get("RECENT_PATHS_FILE", "/tmp/codemap-recent.json"))
+PREWARM_TOP_N = int(os.environ.get("PREWARM_TOP_N", "10"))
 
 # Vector index over gobroker file paths (for "similar files / who else might know").
 VECTOR_DB = Path(os.environ.get("VECTOR_DB", "/tmp/codemap-vectors.sqlite"))

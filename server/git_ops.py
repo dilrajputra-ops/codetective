@@ -30,6 +30,16 @@ def file_exists(path: str) -> bool:
     return full.is_file()
 
 
+def latest_sha(path: str) -> str:
+    """Last commit SHA touching `path`. Empty string if untracked / on error.
+    Cheap: one `git log -1` invocation."""
+    try:
+        out = _run(["git", "log", "-1", "--format=%H", "--", path], timeout=3).strip()
+        return out[:40]
+    except Exception:
+        return ""
+
+
 def read_file(path: str, max_bytes: int = 1_000_000, max_lines: int = 2000) -> dict:
     """Return file content for the visual range picker. Hard caps for safety."""
     full = (GOBROKER_PATH / path).resolve()
