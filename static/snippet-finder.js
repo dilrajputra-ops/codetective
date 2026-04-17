@@ -10,15 +10,15 @@
   window.__sfMounted = true;
 
   const tpl = `
-    <button class="sf-fab" id="sf-fab" title="Paste a code snippet to find it (⇧⌘F)">
+    <button class="sf-fab" id="sf-fab" title="Ask your codebase — paste any snippet (⇧⌘F)">
       <span class="sf-icon" aria-hidden="true">⌕</span>
-      <span class="sf-label"><b>Find snippet</b> in gobroker — paste any code…</span>
+      <span class="sf-label"><b>Ask your codebase</b> — paste any snippet to find it in gobroker</span>
       <span class="sf-kbd">⇧⌘F</span>
     </button>
     <div class="sf-overlay" id="sf-overlay" role="dialog" aria-hidden="true">
       <div class="sf-panel" role="document">
         <div class="sf-head">
-          <h2>Find a code snippet in gobroker</h2>
+          <h2>Ask your codebase</h2>
           <span class="sf-hint">git grep, no LLM</span>
           <button class="sf-close" id="sf-close" aria-label="Close">×</button>
         </div>
