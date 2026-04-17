@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Alpaca Codemap — Contributors</title>
+<title>Alpaca Codetective — Contributors</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
@@ -35,7 +35,9 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   background:linear-gradient(90deg,var(--alpaca-yellow) 0%,var(--alpaca-gold) 60%,var(--alpaca-yellow) 100%)}
 .logo{width:30px;height:30px;border-radius:7px;display:block;object-fit:cover;
   background:#fff;box-shadow:0 0 0 1.5px var(--alpaca-yellow),0 1px 3px rgba(184,132,26,.18)}
-.brand-name{font-weight:700;letter-spacing:-.01em;font-size:15px}
+.brand-name{font-weight:800;letter-spacing:-.02em;font-size:16px;line-height:1;
+  display:inline-flex;align-items:baseline;user-select:none}
+.brand-name .b-accent{color:var(--alpaca-gold);font-style:italic;font-weight:600;letter-spacing:-.01em}
 .topbar .crumbs{color:var(--faint);font-size:12px;margin-left:8px}
 .topbar .crumbs a{color:var(--dim)}
 .topbar .spacer{flex:1}
@@ -197,8 +199,8 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 <body>
 
 <div class="topbar">
-  <img class="logo" src="/static/icon-192.png" alt="Codemap">
-  <div class="brand-name">Codemap</div>
+  <img class="logo" src="/static/icon-192.png" alt="Codetective">
+  <div class="brand-name">Code<span class="b-accent">tective</span></div>
   <div class="crumbs"><a href="/">Investigate</a> · <span id="crumb-current">Contributors</span></div>
   <div class="spacer"></div>
   <div class="stat" id="topstat"></div>

@@ -1,5 +1,5 @@
 {
-  "_doc": "Codemap manual overrides for CODEOWNERS team slugs. Auto-fetched fields (team_name, slack channels, GH members) come from gh_teams.py + slack_channels.json. This file ONLY holds info no API can give us: on_call, escalation, docs. Empty entries are fine; the team simply won't show those fields. Add an entry when you know the on-call rotation, escalation contact, or canonical docs URL for a team.",
+  "_doc": "Codetective manual overrides for CODEOWNERS team slugs. Auto-fetched fields (team_name, slack channels, GH members) come from gh_teams.py + slack_channels.json. This file ONLY holds info no API can give us: on_call, escalation, docs. Empty entries are fine; the team simply won't show those fields. Add an entry when you know the on-call rotation, escalation contact, or canonical docs URL for a team.",
 
   "@alpacahq/admin":                  { "on_call": "", "escalation": "", "docs": "" },
   "@alpacahq/applications":           { "on_call": "", "escalation": "", "docs": "" },

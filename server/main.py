@@ -1,4 +1,4 @@
-"""FastAPI app for Codemap."""
+"""FastAPI app for Codetective."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,7 @@ from . import contributor_summary, contributors as contributors_mod
 from . import git_ops, paths_index, pr as pr_mod, prewarm, recent, snippet_search, synth, vectors
 from .config import GOBROKER_PATH, GH_REPO, OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_EMBED_MODEL
 
-app = FastAPI(title="Codemap")
+app = FastAPI(title="Codetective")
 
 ROOT = Path(__file__).resolve().parents[1]
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")

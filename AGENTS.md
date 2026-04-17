@@ -1,4 +1,4 @@
-# Codemap — Agent Development Guidance
+# Codetective — Agent Development Guidance
 
 Read this before making changes. It encodes scope decisions and design language we've already agreed on, so future sessions don't drift.
 
@@ -6,10 +6,10 @@ Read this before making changes. It encodes scope decisions and design language 
 
 - **Single repo only**: gobroker (`~/Documents/alpaca/gobroker`). No multi-repo, no repo dropdown, no path-prefix parsing. v2 problem.
 - **One screen, one input, one result**. No demo chips, no preset workflows, no multi-step "investigate" wizard. Paste path → get answer.
-- **Not Pathfinder**. If a feature smells like Onyx search, system topology, or scoped re-querying, it doesn't belong here. Codemap is deterministic + 1 local LLM call.
+- **Not Pathfinder**. If a feature smells like Onyx search, system topology, or scoped re-querying, it doesn't belong here. Codetective is deterministic + 1 local LLM call.
 - **No chatbot, no digital twin, no NL Q&A.**
 - **No frontend framework**. Single static `index.html` + vanilla JS + `fetch()`. No React, no build step.
-- **LOCAL ONLY. No cloud LLM, no cloud embeddings.** Codemap reads proprietary org metadata (paths, author names, commit subjects, Jira IDs from a private repo). Nothing leaves the machine. No OpenAI, no Anthropic, no hosted Llama API, no third-party embedding service. If a contributor proposes a cloud LLM, reject the PR.
+- **LOCAL ONLY. No cloud LLM, no cloud embeddings.** Codetective reads proprietary org metadata (paths, author names, commit subjects, Jira IDs from a private repo). Nothing leaves the machine. No OpenAI, no Anthropic, no hosted Llama API, no third-party embedding service. If a contributor proposes a cloud LLM, reject the PR.
 
 ## Architecture (locked)
 
@@ -26,7 +26,7 @@ Read this before making changes. It encodes scope decisions and design language 
 - **gh CLI** authed (`gh auth status`). Used for open-PR lookups.
 - **gobroker clone** at `GOBROKER_PATH`.
 
-If any of these are missing, Codemap degrades gracefully (templated narrative, empty open-PR list, empty similar-files list) and surfaces the degradation in the Sources footer.
+If any of these are missing, Codetective degrades gracefully (templated narrative, empty open-PR list, empty similar-files list) and surfaces the degradation in the Sources footer.
 
 ## Data sources (in order of trust)
 

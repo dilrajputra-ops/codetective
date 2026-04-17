@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Alpaca Codemap</title>
+<title>Alpaca Codetective</title>
 <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
@@ -43,7 +43,9 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   background:linear-gradient(180deg,var(--alpaca-cream) 0%,var(--surface) 100%)}
 .logo{width:28px;height:28px;border-radius:7px;display:block;object-fit:cover;
   background:#fff;box-shadow:0 0 0 1.5px var(--alpaca-yellow),0 1px 3px rgba(184,132,26,.18)}
-.brand-name{font-weight:700;letter-spacing:-.01em;font-size:14px}
+.brand-name{font-weight:800;letter-spacing:-.02em;font-size:15.5px;line-height:1;
+  display:inline-flex;align-items:baseline;user-select:none}
+.brand-name .b-accent{color:var(--alpaca-gold);font-style:italic;font-weight:600;letter-spacing:-.01em}
 .tag{margin-left:auto;font-size:10px;font-weight:700;color:var(--alpaca-gold);
   background:var(--alpaca-yellow-soft);border:1px solid var(--alpaca-gold-bg);
   border-radius:5px;padding:2px 7px;letter-spacing:.02em}
@@ -138,9 +140,65 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   border-radius:6px;font-size:12px;color:var(--dim);cursor:pointer;transition:all .12s}
 .head-actions button:hover{border-color:var(--accent);color:var(--accent)}
 
-.team-line{display:flex;align-items:baseline;gap:14px;margin-bottom:12px;flex-wrap:wrap}
-.team-name{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.team-line{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.team-eyebrow{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--faint);margin-right:2px}
+.team-name{font-size:18px;font-weight:700;letter-spacing:-.01em;line-height:1.2;color:var(--text)}
+.team-name a{color:inherit;text-decoration:none;border-bottom:1.5px solid var(--alpaca-yellow,#FFD400);transition:color .12s}
+.team-name a:hover{color:var(--alpaca-gold,#C8941A)}
 .team-lane{font-size:12px;color:var(--dim);font-family:"SF Mono",ui-monospace,monospace}
+.team-link{font-size:11px;color:var(--dim);text-decoration:none;display:inline-flex;align-items:center;gap:3px;
+  padding:3px 8px;border-radius:6px;border:1px solid var(--border);transition:.12s}
+.team-link:hover{border-color:var(--alpaca-gold,#C8941A);color:var(--text);text-decoration:none}
+
+/* PR review status card */
+.review-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:14px 18px;margin-bottom:16px}
+.review-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.review-card-head h3{margin:0;font-size:13px;font-weight:700;letter-spacing:.01em;color:var(--text)}
+.review-tally{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.review-next{font-size:12.5px;color:var(--text);background:var(--bg);border:1px solid var(--border);
+  border-left:3px solid var(--alpaca-yellow,#FFD400);border-radius:6px;padding:8px 12px;margin-bottom:10px;line-height:1.5}
+.review-next strong{color:var(--text)}
+.review-list{display:flex;flex-direction:column;gap:6px}
+.review-row{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--bg);
+  border-radius:6px;font-size:12.5px}
+.review-row .rv-state{flex-shrink:0;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.02em}
+.review-row .rv-state.approved{background:var(--green-bg);color:var(--green)}
+.review-row .rv-state.changes{background:var(--rose-bg);color:var(--rose)}
+.review-row .rv-state.commented{background:var(--bg);color:var(--dim);border:1px solid var(--border)}
+.review-row .rv-state.dismissed{background:var(--bg);color:var(--faint);border:1px solid var(--border);text-decoration:line-through}
+.review-row .rv-author{flex:1;color:var(--text);font-weight:500}
+.review-row .rv-author a{color:inherit;text-decoration:none}
+.review-row .rv-author a:hover{color:var(--accent)}
+.review-row .rv-when{color:var(--faint);font-size:11px}
+.pr-body{font-size:12.5px;line-height:1.55;color:var(--dim);white-space:pre-wrap;
+  background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;
+  max-height:140px;overflow:hidden;position:relative;font-family:inherit}
+.pr-body.expanded{max-height:none}
+.pr-body-toggle{display:inline-block;margin-top:6px;background:transparent;border:none;color:var(--accent);
+  font-size:11.5px;font-weight:600;cursor:pointer;padding:0}
+.pr-body-toggle:hover{text-decoration:underline}
+
+/* Code snippet preview (the actual lines being investigated) */
+.code-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:16px;overflow:hidden}
+.code-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--border);
+  font-size:11px;color:var(--dim);font-weight:600;letter-spacing:.02em}
+.code-card-head .code-meta{display:flex;align-items:center;gap:8px}
+.code-card-head .code-toggle{background:transparent;border:1px solid var(--border);color:var(--dim);
+  font-size:11px;padding:2px 8px;border-radius:5px;cursor:pointer;transition:.12s}
+.code-card-head .code-toggle:hover{border-color:var(--accent);color:var(--accent)}
+.code-block{margin:0;padding:10px 0;font-family:"SF Mono",ui-monospace,monospace;font-size:12px;
+  line-height:1.55;overflow-x:auto;max-height:420px;overflow-y:auto;background:var(--surface)}
+.code-block .ln{display:flex;align-items:flex-start;padding:0 14px}
+.code-block .ln.hl{background:rgba(255,212,0,.10);border-left:2px solid var(--alpaca-yellow,#FFD400);padding-left:12px}
+.code-block .ln-no{color:var(--faint);min-width:38px;text-align:right;padding-right:14px;
+  user-select:none;font-variant-numeric:tabular-nums}
+.code-block .ln-tx{flex:1;white-space:pre;color:var(--text)}
+.code-block .ln.hl .ln-no{color:var(--alpaca-gold,#C8941A);font-weight:700}
+.code-card .code-empty{padding:18px 14px;color:var(--faint);font-size:12px;text-align:center}
 
 .pills{display:flex;gap:6px;flex-wrap:wrap}
 .pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:14px;display:inline-flex;align-items:center;gap:4px}
@@ -357,8 +415,8 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 
 <aside class="rail">
   <div class="rail-head">
-    <img class="logo" src="/static/icon-192.png" alt="Codemap">
-    <span class="brand-name">Codemap</span>
+    <img class="logo" src="/static/icon-192.png" alt="Codetective">
+    <span class="brand-name">Code<span class="b-accent">tective</span></span>
     <span class="tag">gobroker</span>
   </div>
 
@@ -403,7 +461,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   <div id="pane-body" class="pane-inner">
     <div class="empty-state"><div class="em-card">
       <h2>Paste a path. See who owns it.</h2>
-      <p>Codemap reads CODEOWNERS, git history, open PRs, and Jira mentions to give you a complete file context in seconds. Local-only — nothing leaves this machine.</p>
+      <p>Codetective reads CODEOWNERS, git history, open PRs, and Jira mentions to give you a complete file context in seconds. Local-only — nothing leaves this machine.</p>
     </div></div>
   </div>
 </main>
@@ -735,6 +793,7 @@ $("range-input").addEventListener("keydown", e => { if (e.key === "Enter") inves
 
 // ---- navigation ----
 function goto(path, range) {
+  if (state.mode !== "path") setMode("path");
   $("path-input").value = path;
   $("range-input").value = range || "";
   investigate();
@@ -773,8 +832,6 @@ function routingStrip(r) {
   const s = r.slack || {};
   const items = [];
   if (s.primary)   items.push(`<span class="rt clickable" onclick="copyText('${esc(s.primary)}','channel')" title="Click to copy"><span class="rt-key">slack</span><span class="rt-val">${esc(s.primary)}</span></span>`);
-  if (s.alerts)    items.push(`<span class="rt clickable" onclick="copyText('${esc(s.alerts)}','channel')" title="Click to copy"><span class="rt-key">alerts</span><span class="rt-val">${esc(s.alerts)}</span></span>`);
-  if (s.errors)    items.push(`<span class="rt clickable" onclick="copyText('${esc(s.errors)}','channel')" title="Click to copy"><span class="rt-key">errors</span><span class="rt-val">${esc(s.errors)}</span></span>`);
   if (r.on_call)   items.push(`<span class="rt"><span class="rt-key">on-call</span><span class="rt-val">${esc(r.on_call)}</span></span>`);
   if (r.escalation) items.push(`<span class="rt"><span class="rt-key">escalate</span><span class="rt-val">${esc(r.escalation)}</span></span>`);
   if (r.docs)      items.push(`<span class="rt clickable" onclick="window.open('${esc(r.docs)}','_blank')"><span class="rt-key">docs</span><span class="rt-val">↗</span></span>`);
@@ -1076,6 +1133,75 @@ function riskFlagRow(f) {
   </div>`;
 }
 
+// PR review status: tally + per-reviewer verdicts + suggested next action.
+function _reviewStateMeta(state) {
+  const s = (state || "").toUpperCase();
+  if (s === "APPROVED")          return { cls: "approved",  label: "approved" };
+  if (s === "CHANGES_REQUESTED") return { cls: "changes",   label: "changes requested" };
+  if (s === "DISMISSED")         return { cls: "dismissed", label: "dismissed" };
+  return                                { cls: "commented", label: s ? s.toLowerCase() : "commented" };
+}
+
+function reviewRowHtml(rv) {
+  const meta = _reviewStateMeta(rv.state);
+  const ago  = _agoShort(rv.submitted_at);
+  return `<div class="review-row">
+    <span class="rv-state ${meta.cls}">${meta.label}</span>
+    <span class="rv-author"><a href="https://github.com/${esc(rv.author)}" target="_blank">@${esc(rv.author)}</a></span>
+    <span class="rv-when">${esc(ago)}</span>
+  </div>`;
+}
+
+function _suggestedAction(c) {
+  const pr = c.pr;
+  const summary = pr.review_summary || [];
+  const approvals = summary.filter(r => r.state === "APPROVED").length;
+  const changes   = summary.filter(r => r.state === "CHANGES_REQUESTED").map(r => r.author);
+  const pendingAssigned = (pr.review_requests || []);
+  const topRev = (c.reviewers.recommended || [])[0];
+
+  if (pr.state === "MERGED") return `Already merged.`;
+  if (pr.is_draft)           return `PR is in draft. No action until the author marks it ready.`;
+  if (changes.length)        return `<strong>Wait for</strong> @${esc(changes[0])} to re-review — they requested changes.`;
+  if (pendingAssigned.length && approvals === 0)
+    return `<strong>Pending</strong> review from ${pendingAssigned.map(l => '@' + esc(l)).join(", ")}.`;
+  if (approvals === 0 && topRev)
+    return `No reviews yet. <strong>Best ping:</strong> ${esc(topRev.name)}${topRev.github_login ? ` (@${esc(topRev.github_login)})` : ""} — top expert on the changed code.`;
+  if (approvals >= 1 && pr.state === "OPEN")
+    return `<strong>${approvals} approval${approvals===1?'':'s'}</strong>${pendingAssigned.length ? `, still waiting on ${pendingAssigned.map(l => '@' + esc(l)).join(", ")}` : "."}`;
+  return "No reviews submitted yet.";
+}
+
+function reviewStatusCardHtml(c) {
+  const pr = c.pr;
+  const summary = pr.review_summary || [];
+  const requested = pr.review_requests || [];
+  const approvals = summary.filter(r => r.state === "APPROVED").length;
+  const changes   = summary.filter(r => r.state === "CHANGES_REQUESTED").length;
+  const comments  = summary.filter(r => r.state === "COMMENTED").length;
+
+  const tallyPills = [
+    approvals ? `<span class="pill green">${approvals} approved</span>` : "",
+    changes   ? `<span class="pill rose">${changes} changes requested</span>` : "",
+    comments  ? `<span class="pill gray">${comments} commented</span>` : "",
+    requested.length ? `<span class="pill amber">${requested.length} pending</span>` : "",
+  ].filter(Boolean).join("");
+
+  const reviewRows = summary.length
+    ? summary.map(reviewRowHtml).join("")
+    : `<div class="review-row" style="color:var(--faint)">No reviews submitted yet.</div>`;
+
+  return `
+    <div class="review-card">
+      <div class="review-card-head">
+        <h3>Review status</h3>
+        <div class="review-tally">${tallyPills || `<span class="pill gray">no reviews</span>`}</div>
+      </div>
+      <div class="review-next">${_suggestedAction(c)}</div>
+      <div class="review-list">${reviewRows}</div>
+    </div>`;
+}
+
 function renderPR(c) {
   const pr = c.pr;
   const stateBadge = pr.is_draft ? `<span class="pill gray">draft</span>`
@@ -1113,6 +1239,8 @@ function renderPR(c) {
       </div>
     </div>
 
+    ${reviewStatusCardHtml(c)}
+
     <div class="tabs">
       <button class="tab on" data-tab="reviewers" onclick="setPRTab('reviewers')">Reviewers (${recommended.length})</button>
       <button class="tab" data-tab="files" onclick="setPRTab('files')">Files (${c.files_count})</button>
@@ -1128,10 +1256,6 @@ function renderPR(c) {
           ? recommended.map(reviewerRow).join("")
           : `<div class="rail-empty">No active engineers found with prior history on these files. This PR may be fresh-territory work.</div>`}
       </div>
-      ${pr.review_requests.length ? `<div class="card">
-        <h3>Currently assigned</h3>
-        ${pr.review_requests.map(login => `<div class="work-item"><div class="w-body"><div class="w-title">${esc(login)}</div></div></div>`).join("")}
-      </div>` : ""}
       ${departedRev.length ? `<div class="card">
         <h3>⚠ Has history but departed</h3>
         <div class="w-sub" style="margin-bottom:8px">These engineers wrote significant parts of the changed code but are no longer at Alpaca. Useful context only.</div>
@@ -1141,7 +1265,7 @@ function renderPR(c) {
 
     <div class="tab-body" data-tab="files">
       <div class="card">
-        <h3>Changed files · click to drill into Codemap</h3>
+        <h3>Changed files · click to drill into Codetective</h3>
         ${c.files.map(fileMiniCard).join("")}
       </div>
     </div>
@@ -1288,10 +1412,17 @@ function headerActionsHtml(c, stages) {
 }
 
 function teamLineHtml(c) {
+  const ghUrl = c.routing?.github_url;
+  const nameHtml = ghUrl
+    ? `<a href="${esc(ghUrl)}" target="_blank" title="Open team on GitHub">${esc(c.summary.title)}</a>`
+    : esc(c.summary.title);
+  const linkHtml = ghUrl
+    ? `<a class="team-link" href="${esc(ghUrl)}" target="_blank" title="Open ${esc(c.team.lane)} on GitHub">${esc(c.team.lane)} ↗</a>`
+    : `<span class="team-lane">${esc(c.team.lane)}</span>`;
   return `
-    <div class="team-name">${esc(c.summary.title)}</div>
-    <div class="team-lane">${esc(c.team.lane)}</div>
-    <span class="pill ${confColor(c.team.confidence)}">${esc(c.team.confidence)} confidence</span>`;
+    <span class="team-eyebrow">Owned by</span>
+    <span class="team-name">${nameHtml}</span>
+    ${linkHtml}`;
 }
 
 function pillsRowHtml(c, stages) {
@@ -1441,6 +1572,75 @@ function sourcesCardHtml(c, stages) {
   </dl>`;
 }
 
+// ---- code snippet preview (the actual lines being investigated) ----
+function codeSnippetCardHtml(c) {
+  const range = c.range || "";
+  const meta = range
+    ? `<span>L${esc(range)}</span>`
+    : `<span>preview</span><span style="color:var(--faint)">· first lines</span>`;
+  return `
+    <div class="code-card-head">
+      <div class="code-meta"><strong>Code</strong>${meta}</div>
+      <button class="code-toggle" id="code-toggle" onclick="toggleCodeSnippet()">Show</button>
+    </div>
+    <div id="code-block-wrap" style="display:none"></div>`;
+}
+
+function toggleCodeSnippet() {
+  const wrap = document.getElementById("code-block-wrap");
+  const btn  = document.getElementById("code-toggle");
+  if (!wrap || !btn) return;
+  const hidden = wrap.style.display === "none";
+  wrap.style.display = hidden ? "" : "none";
+  btn.textContent = hidden ? "Hide" : "Show";
+  if (hidden && !wrap.dataset.loaded) {
+    wrap.innerHTML = `<div class="code-empty"><span class="mini-spin"></span> loading file…</div>`;
+    const path  = wrap.dataset.path;
+    const range = wrap.dataset.range || "";
+    if (path) loadCodeSnippet(path, range);
+  }
+}
+
+async function loadCodeSnippet(path, range) {
+  const wrap = document.getElementById("code-block-wrap");
+  if (!wrap) return;
+  wrap.dataset.loaded = "1";
+  try {
+    const res = await fetch(`/file?path=${encodeURIComponent(path)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const lines = data.lines || [];
+    if (!lines.length) { wrap.innerHTML = `<div class="code-empty">File is empty.</div>`; return; }
+
+    let start = 1, end = lines.length;
+    let hlStart = 0, hlEnd = 0;
+    if (range) {
+      const m = range.match(/^(\d+)(?:-(\d+))?$/);
+      if (m) {
+        hlStart = parseInt(m[1], 10);
+        hlEnd   = m[2] ? parseInt(m[2], 10) : hlStart;
+        // Show ~5 lines of context around the range, capped at 60 visible lines.
+        const pad = 5;
+        start = Math.max(1, hlStart - pad);
+        end   = Math.min(lines.length, hlEnd + pad);
+        if (end - start + 1 > 60) end = start + 59;
+      }
+    } else {
+      end = Math.min(lines.length, 30);
+    }
+
+    const rows = [];
+    for (let i = start; i <= end; i++) {
+      const txt = lines[i - 1] ?? "";
+      const isHl = hlStart && i >= hlStart && i <= hlEnd;
+      rows.push(`<div class="ln${isHl ? " hl" : ""}"><span class="ln-no">${i}</span><span class="ln-tx">${esc(txt) || "&nbsp;"}</span></div>`);
+    }
+    wrap.innerHTML = `<pre class="code-block">${rows.join("")}</pre>`;
+  } catch (e) {
+    wrap.innerHTML = `<div class="code-empty">Couldn't load file (${esc(String(e.message || e))}).</div>`;
+  }
+}
+
 // One-time DOM scaffold; subsequent stage events update only the affected ids.
 function renderShell(c, stages) {
   return `
@@ -1450,6 +1650,8 @@ function renderShell(c, stages) {
       <div class="pills" id="sec-pills">${pillsRowHtml(c, stages)}</div>
       <div id="sec-routing-strip">${routingStrip(c.routing)}</div>
     </div>
+
+    <div class="code-card" id="sec-code-snippet">${codeSnippetCardHtml(c)}</div>
 
     <div class="tabs">
       <button class="tab" data-tab="overview" onclick="setTab('overview')">Overview</button>
@@ -1521,6 +1723,8 @@ function render(c, justArrived) {
     state._renderKey = key;
     $("pane-body").innerHTML = renderShell(c, stages);
     setTab(activeTab);
+    const wrap = document.getElementById("code-block-wrap");
+    if (wrap) { wrap.dataset.path = c.path; wrap.dataset.range = c.range || ""; }
     return;
   }
 

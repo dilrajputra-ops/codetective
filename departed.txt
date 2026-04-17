@@ -1,4 +1,4 @@
-# Codemap: known-departed contributors.
+# Codetective: known-departed contributors.
 # One match per line. Lookup is case-insensitive substring match against
 # both the git author NAME and EMAIL of each blame contributor.
 #

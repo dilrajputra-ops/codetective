@@ -1,4 +1,4 @@
-"""PR-mode investigation: aggregate per-file Codemap signals into PR-shaped triage info.
+"""PR-mode investigation: aggregate per-file Codetective signals into PR-shaped triage info.
 
 Reuses every existing primitive (codeowners, git blame, expertise, gh PR search,
 employees, owners_map). Adds three things on top:
@@ -100,7 +100,7 @@ def fetch_pr(pr_number: int) -> dict:
 # ---------- Per-file lite investigation ----------
 
 def investigate_file_lite(path: str) -> dict:
-    """Codemap signals for one file, minus LLM/merged/jira.
+    """Codetective signals for one file, minus LLM/merged/jira.
 
     Optimized for PR mode where we run this across N files in parallel:
       - codeowners (with parent inference)
@@ -457,9 +457,33 @@ def investigate(raw_ident: str) -> dict:
 
 def _pr_summary(pr: dict) -> dict:
     author = (pr.get("author") or {}).get("login", "")
+    raw_reviews = [
+        {"author": (r.get("author") or {}).get("login", ""),
+         "state": r.get("state", ""),
+         "submitted_at": r.get("submittedAt", "")}
+        for r in (pr.get("reviews") or [])
+    ]
+    # Build per-author latest verdict (mirrors GitHub's merge-block rule).
+    # APPROVED / CHANGES_REQUESTED override earlier COMMENTED entries from the
+    # same person; we keep the most recent of those two states.
+    latest_by_author: dict[str, dict] = {}
+    for rv in sorted(raw_reviews, key=lambda r: r.get("submitted_at", "")):
+        a = rv.get("author", "")
+        if not a:
+            continue
+        if rv.get("state") in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED"):
+            latest_by_author[a] = rv
+        elif a not in latest_by_author:
+            latest_by_author[a] = rv  # COMMENTED counts only if no firmer verdict
+    review_summary = list(latest_by_author.values())
+    review_summary.sort(key=lambda r: r.get("submitted_at", ""), reverse=True)
+
+    body = (pr.get("body") or "").strip()
     return {
         "number": pr.get("number"),
         "title": pr.get("title", ""),
+        "body": body,
+        "body_truncated": body[:600] + ("…" if len(body) > 600 else ""),
         "url": pr.get("url", ""),
         "state": pr.get("state", ""),
         "is_draft": pr.get("isDraft", False),
@@ -473,12 +497,8 @@ def _pr_summary(pr: dict) -> dict:
         "updated_at": pr.get("updatedAt", ""),
         "merged_at": pr.get("mergedAt"),
         "review_requests": [r.get("login") or r.get("name", "") for r in (pr.get("reviewRequests") or [])],
-        "reviews": [
-            {"author": (r.get("author") or {}).get("login", ""),
-             "state": r.get("state", ""),
-             "submitted_at": r.get("submittedAt", "")}
-            for r in (pr.get("reviews") or [])
-        ],
+        "reviews": raw_reviews,
+        "review_summary": review_summary,
     }
 
 

@@ -1,11 +1,11 @@
-# Alpaca Codemap — Product Notes
+# Alpaca Codetective — Product Notes
 
 > Dev/scope guardrails live in [AGENTS.md](AGENTS.md). This file is the product spec.
 
 ## Product Definition
-Alpaca Codemap is an internal code-context tool for unfamiliar code.
+Alpaca Codetective is an internal code-context tool for unfamiliar code.
 
-Paste a code path, symbol, or line range and Codemap should show:
+Paste a code path, symbol, or line range and Codetective should show:
 - the active engineering team working in that area
 - the active contributor profiles around the path
 - the timeline of change
