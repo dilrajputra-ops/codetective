@@ -150,6 +150,30 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .sidebar-card li{font-size:12.5px}
 
 .skeleton{background:var(--bg);border-radius:6px;height:14px;width:60%;margin:6px 0}
+
+/* Profile summary card (LLM-generated) */
+.summary-card{background:linear-gradient(180deg,#fafbff 0%,var(--surface) 100%);
+  border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;
+  position:relative}
+.summary-card .sc-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.summary-card .sc-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.summary-card .sc-model{font-size:10px;color:var(--faint);background:var(--bg);
+  padding:2px 7px;border-radius:10px;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+.summary-card .sc-model::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green)}
+.summary-card .sc-prose{font-size:13.5px;line-height:1.55;color:var(--text)}
+.summary-card .sc-loading{font-size:12px;color:var(--dim);font-style:italic}
+.summary-card .sc-offline{font-size:12px;color:var(--amber);background:var(--amber-bg);
+  padding:8px 10px;border-radius:6px;display:inline-block}
+.summary-card .sc-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.summary-card .sc-tag{font-size:10.5px;padding:3px 9px;border-radius:10px;
+  background:var(--accent-bg);color:var(--accent);font-weight:500}
+.summary-card .sc-themes{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:5px}
+.summary-card .sc-theme{font-size:12px;color:var(--dim);line-height:1.4;display:flex;gap:6px}
+.summary-card .sc-theme::before{content:"›";color:var(--accent);font-weight:600;flex-shrink:0}
+.shimmer{background:linear-gradient(90deg,var(--bg) 0%,#f0f1f5 50%,var(--bg) 100%);
+  background-size:200% 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:4px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .loading{padding:40px;text-align:center;color:var(--dim)}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border-strong);
   border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
@@ -415,10 +439,63 @@ async function loadDetail(login) {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     state.data = await r.json();
     renderDetail();
+    // Kick off summary fetch in parallel — it can take ~5s on a local LLM,
+    // so we render the shell + git data immediately and stream this in.
+    fetchSummary(login);
   } catch(e) {
     $("content").innerHTML = `<div class="empty-state">Failed to load profile: ${esc(e.message)}
       <br><br><a href="/contributors">← Back to list</a></div>`;
   }
+}
+
+async function fetchSummary(login) {
+  try {
+    const r = await fetch(`/api/contributors/${encodeURIComponent(login)}/summary`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const s = await r.json();
+    renderSummary(s);
+  } catch(e) {
+    renderSummary({summary:"", reason:`fetch failed: ${e.message}`, llm_used:false});
+  }
+}
+
+function renderSummary(s) {
+  const el = $("summary-card");
+  if (!el) return;
+  if (!s.llm_used || !s.summary) {
+    const reason = s.reason || "no summary available";
+    if (reason === "no recent activity to summarize") {
+      el.innerHTML = `
+        <div class="sc-head">
+          <span class="sc-title">Profile summary</span>
+        </div>
+        <div class="sc-prose" style="color:var(--dim);font-style:italic">
+          Not enough gobroker activity to summarize. This person has no recent commits
+          or top files in the cached history.
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <div class="sc-head">
+          <span class="sc-title">Profile summary</span>
+        </div>
+        <div class="sc-offline">
+          Local LLM offline — summary unavailable. Start Ollama and pull a model to
+          enable this section: <span class="mono">brew services start ollama &amp;&amp; ollama pull qwen2.5-coder:3b</span>
+        </div>`;
+    }
+    return;
+  }
+  const tagsHtml = (s.focus_areas||[]).map(t => `<span class="sc-tag">${esc(t)}</span>`).join("");
+  const themesHtml = (s.recent_themes||[]).map(t => `<div class="sc-theme">${esc(t)}</div>`).join("");
+  el.innerHTML = `
+    <div class="sc-head">
+      <span class="sc-title">Profile summary</span>
+      <span class="sc-model">local · ${esc(s.model || "model")}</span>
+    </div>
+    <div class="sc-prose">${esc(s.summary)}</div>
+    ${tagsHtml ? `<div class="sc-tags">${tagsHtml}</div>` : ""}
+    ${themesHtml ? `<div class="sc-themes">${themesHtml}</div>` : ""}
+  `;
 }
 
 function renderDetail() {
@@ -478,6 +555,15 @@ function renderDetail() {
 
     <div class="detail">
       <div class="detail-main">
+        <div class="summary-card" id="summary-card">
+          <div class="sc-head">
+            <span class="sc-title">Profile summary</span>
+            <span class="sc-loading">generating from gobroker activity…</span>
+          </div>
+          <div class="shimmer" style="height:14px;width:90%;margin-bottom:8px"></div>
+          <div class="shimmer" style="height:14px;width:75%;margin-bottom:8px"></div>
+          <div class="shimmer" style="height:14px;width:60%"></div>
+        </div>
         <div class="card">
           <h3>Top files <span class="hint">by commits touching each path (last ~80 commits)</span></h3>
           ${topFilesHtml}

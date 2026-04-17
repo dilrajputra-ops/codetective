@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import contributors as contributors_mod
+from . import contributor_summary, contributors as contributors_mod
 from . import git_ops, paths_index, pr as pr_mod, prewarm, recent, synth, vectors
 from .config import GOBROKER_PATH, GH_REPO, OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_EMBED_MODEL
 
@@ -138,6 +138,18 @@ def api_contributor_detail(login: str):
     if data.get("error"):
         raise HTTPException(400, data["error"])
     return JSONResponse(data)
+
+
+@app.get("/api/contributors/{login}/summary")
+def api_contributor_summary(login: str):
+    """LLM-generated profile narrative. Lazy-loaded by the detail page so
+    the rest of the profile renders instantly while the summary streams in.
+    Returns shaped empty payload (not 500) when LLM is unreachable so the
+    UI can show an honest 'local LLM offline' state."""
+    detail = contributors_mod.detail(login)
+    if detail.get("error"):
+        raise HTTPException(400, detail["error"])
+    return JSONResponse(contributor_summary.generate(detail))
 
 
 @app.get("/contributors")
