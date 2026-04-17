@@ -49,6 +49,48 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .tag{margin-left:auto;font-size:10px;font-weight:700;color:var(--alpaca-gold);
   background:var(--alpaca-yellow-soft);border:1px solid var(--alpaca-gold-bg);
   border-radius:5px;padding:2px 7px;letter-spacing:.02em}
+
+/* Repo switcher (dropdown around the sidebar tag) */
+.repo-switch{position:relative;margin-left:auto}
+.repo-switch-btn{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;
+  color:var(--alpaca-gold);background:var(--alpaca-yellow-soft);
+  border:1px solid var(--alpaca-gold-bg);border-radius:5px;padding:2px 4px 2px 7px;
+  letter-spacing:.02em;cursor:pointer;transition:.12s;font-family:inherit}
+.repo-switch-btn:hover{background:var(--alpaca-yellow);border-color:var(--alpaca-gold);color:#5a3e08}
+.repo-switch-btn[aria-expanded="true"]{background:var(--alpaca-yellow);border-color:var(--alpaca-gold);color:#5a3e08}
+.repo-switch-btn .rs-chevron{font-size:8px;opacity:.7;transition:transform .15s}
+.repo-switch-btn[aria-expanded="true"] .rs-chevron{transform:rotate(180deg)}
+.repo-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:50;min-width:220px;
+  background:var(--surface);border:1px solid var(--border);border-radius:9px;
+  box-shadow:0 6px 24px rgba(20,16,8,.10),0 2px 6px rgba(20,16,8,.06);
+  padding:6px;display:none;animation:rs-fadein .12s ease-out}
+.repo-menu.open{display:block}
+@keyframes rs-fadein{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:none}}
+.repo-menu-head{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--faint);padding:6px 10px 4px}
+.repo-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;
+  font-size:12px;cursor:pointer;color:var(--text);transition:background .1s}
+.repo-item:hover{background:var(--bg)}
+.repo-item.active{background:var(--alpaca-yellow-soft)}
+.repo-item.disabled{cursor:not-allowed;color:var(--faint)}
+.repo-item.disabled:hover{background:var(--bg)}
+.repo-item .ri-check{width:12px;color:var(--alpaca-gold);font-weight:800;font-size:11px;flex-shrink:0}
+.repo-item:not(.active) .ri-check{visibility:hidden}
+.repo-item .ri-name{flex:1;font-weight:600}
+.repo-item.disabled .ri-name{font-weight:500}
+.repo-item .ri-soon{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--faint);background:var(--bg);border:1px solid var(--border);
+  border-radius:3px;padding:1px 5px}
+.repo-menu-foot{border-top:1px solid var(--border);margin-top:4px;padding:8px 10px;
+  font-size:10.5px;color:var(--faint);line-height:1.45}
+.repo-menu-foot code{font-family:"SF Mono",ui-monospace,monospace;font-size:10px;
+  background:var(--bg);padding:1px 4px;border-radius:3px;color:var(--dim)}
+.repo-toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);z-index:10000;
+  background:rgba(24,28,31,.94);color:rgba(255,255,255,.92);
+  font-size:12px;padding:9px 14px;border-radius:8px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 4px 12px rgba(0,0,0,.18);opacity:0;transition:opacity .16s;pointer-events:none}
+.repo-toast.show{opacity:1}
 .rail-nav{display:flex;gap:0;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg)}
 .rail-nav a{flex:1;text-align:center;font-size:11px;font-weight:600;color:var(--dim);
   padding:6px 8px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em;transition:.1s}
@@ -417,7 +459,38 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   <div class="rail-head">
     <img class="logo" src="/static/icon-192.png" alt="Codetective">
     <span class="brand-name">Code<span class="b-accent">tective</span></span>
-    <span class="tag">gobroker</span>
+    <div class="repo-switch">
+      <button class="repo-switch-btn" id="repo-switch-btn" aria-haspopup="listbox" aria-expanded="false"
+              onclick="toggleRepoMenu(event)" title="Switch repo">
+        <span id="repo-switch-label">gobroker</span>
+        <span class="rs-chevron">▾</span>
+      </button>
+      <div class="repo-menu" id="repo-menu" role="listbox">
+        <div class="repo-menu-head">Investigate in</div>
+        <div class="repo-item active" role="option" aria-selected="true" data-repo="gobroker">
+          <span class="ri-check">✓</span><span class="ri-name">gobroker</span>
+        </div>
+        <div class="repo-item disabled" role="option" aria-disabled="true" data-repo="ledgie"
+             onclick="showRepoToast('ledgie')">
+          <span class="ri-check">✓</span><span class="ri-name">ledgie</span>
+          <span class="ri-soon">soon</span>
+        </div>
+        <div class="repo-item disabled" role="option" aria-disabled="true" data-repo="admin"
+             onclick="showRepoToast('admin')">
+          <span class="ri-check">✓</span><span class="ri-name">admin</span>
+          <span class="ri-soon">soon</span>
+        </div>
+        <div class="repo-item disabled" role="option" aria-disabled="true" data-repo="trading-api"
+             onclick="showRepoToast('trading-api')">
+          <span class="ri-check">✓</span><span class="ri-name">trading-api</span>
+          <span class="ri-soon">soon</span>
+        </div>
+        <div class="repo-menu-foot">
+          Single-repo for now. Set the target repo via <code>GOBROKER_PATH</code> in <code>.env</code>.
+        </div>
+      </div>
+      <div class="repo-toast" id="repo-toast" role="status" aria-live="polite"></div>
+    </div>
   </div>
 
   <div class="rail-nav">
@@ -790,6 +863,38 @@ $("path-input").addEventListener("keydown", e => {
   } else if (e.key === "Escape") { box.classList.remove("on"); }
 });
 $("range-input").addEventListener("keydown", e => { if (e.key === "Enter") investigate(); });
+
+// ---- repo switcher ----
+function toggleRepoMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById("repo-menu");
+  const btn  = document.getElementById("repo-switch-btn");
+  if (!menu || !btn) return;
+  const open = menu.classList.toggle("open");
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+function closeRepoMenu() {
+  const menu = document.getElementById("repo-menu");
+  const btn  = document.getElementById("repo-switch-btn");
+  if (menu) menu.classList.remove("open");
+  if (btn)  btn.setAttribute("aria-expanded", "false");
+}
+function showRepoToast(repo) {
+  const t = document.getElementById("repo-toast");
+  if (!t) return;
+  t.textContent = `${repo} coming soon — single-repo mode for this build.`;
+  t.classList.add("show");
+  clearTimeout(showRepoToast._tid);
+  showRepoToast._tid = setTimeout(() => t.classList.remove("show"), 2400);
+  closeRepoMenu();
+}
+document.addEventListener("click", e => {
+  const menu = document.getElementById("repo-menu");
+  if (!menu || !menu.classList.contains("open")) return;
+  if (menu.contains(e.target) || e.target.closest("#repo-switch-btn")) return;
+  closeRepoMenu();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeRepoMenu(); });
 
 // ---- navigation ----
 function goto(path, range) {
