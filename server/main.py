@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import contributor_summary, contributors as contributors_mod
-from . import git_ops, paths_index, pr as pr_mod, prewarm, recent, synth, vectors
+from . import git_ops, paths_index, pr as pr_mod, prewarm, recent, snippet_search, synth, vectors
 from .config import GOBROKER_PATH, GH_REPO, OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_EMBED_MODEL
 
 app = FastAPI(title="Codemap")
@@ -128,6 +128,18 @@ def pr_investigate(ident: str):
     if case.get("error"):
         raise HTTPException(400, case["error"])
     return JSONResponse(case)
+
+
+class FindBody(BaseModel):
+    snippet: str
+
+
+@app.post("/find")
+def find_snippet(body: FindBody):
+    """Locate a pasted code snippet in gobroker via `git grep`. Returns
+    [{path, line_start, line_end, preview, ...}] for the floating
+    snippet-finder bar."""
+    return JSONResponse(snippet_search.find(body.snippet))
 
 
 @app.get("/api/contributors")
