@@ -10,10 +10,10 @@
   window.__sfMounted = true;
 
   const tpl = `
-    <button class="sf-fab" id="sf-fab" title="Investigate your codebase — paste any snippet (⇧⌘F)">
+    <button class="sf-fab" id="sf-fab" title="Investigate your codebase — paste any snippet (Enter)">
       <span class="sf-icon" aria-hidden="true">⌕</span>
       <span class="sf-label"><b>Investigate your codebase</b> — paste any snippet</span>
-      <span class="sf-kbd">⇧⌘F</span>
+      <span class="sf-kbd" aria-label="Press Enter">↵</span>
     </button>
     <div class="sf-overlay" id="sf-overlay" role="dialog" aria-hidden="true">
       <div class="sf-panel" role="document">
@@ -67,6 +67,18 @@
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "f") {
       e.preventDefault();
       overlay.classList.contains("on") ? close() : open();
+    }
+    // Bare Enter opens the bar when nothing else is focused (idle page).
+    if (e.key === "Enter" && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+        && !overlay.classList.contains("on")) {
+      const t = e.target;
+      const tag = t && t.tagName;
+      const editable = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
+        || (t && t.isContentEditable);
+      if (!editable) {
+        e.preventDefault();
+        open();
+      }
     }
     if (e.key === "Escape" && overlay.classList.contains("on")) {
       close();
