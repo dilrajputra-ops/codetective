@@ -167,7 +167,7 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
         "commits": [{"date": c["date"], "subject": c["subject"], "author": c["author"]} for c in commits[:8]],
         "open_prs": open_prs[:3],
         "jira": jira_ids[:3],
-        "top_contributors": [{"name": b["name"], "lines": b["lines"]} for b in top_blame],
+        "top_contributors": [{"name": c["name"], "lines": c["lines"]} for c in contributors_scored[:5]],
     }
     narrative = llm.synthesize(llm_signals)
 
