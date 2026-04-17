@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import git_ops, paths_index, pr as pr_mod, prewarm, recent, synth, vectors
-from .config import GOBROKER_PATH, GH_REPO
+from .config import GOBROKER_PATH, GH_REPO, OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_EMBED_MODEL
 
 app = FastAPI(title="Codemap")
 
@@ -34,6 +34,11 @@ def health():
         "gobroker_exists": GOBROKER_PATH.exists(),
         "gh_repo": GH_REPO,
         "vector_index": vectors.index_size(),
+        "ollama": {
+            "host": OLLAMA_HOST,
+            "model": OLLAMA_MODEL,
+            "embed_model": OLLAMA_EMBED_MODEL,
+        },
     }
 
 

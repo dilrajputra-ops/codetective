@@ -128,7 +128,6 @@ def _build_contributors(
     commits_with_stats,
     first_author_data,
     open_pr_authors,
-    blame_lines,
     routing,
     still_on_team_fn,
 ):
@@ -167,7 +166,6 @@ def _build_contributors(
                 "score": round(c["score"], 2),
                 "score_breakdown": c["score_breakdown"],
                 "is_departed": c.get("is_departed", False) or emp_status == "departed",
-                "snippets": blame_lines.get(key, [])[:5],
                 "status": emp_status,
                 "still_on_team": on_team,
             }
@@ -222,7 +220,6 @@ def investigate_stream(path: str, range_str: Optional[str]):
     owners_match: dict = {"owners": [], "rule": None, "line": None, "source": None, "inferred": False, "inferred_from": None}
     commits: list = []
     blame: list = []
-    blame_lines: dict = {}
     commits_stats: list = []
     first_author_data: dict = {}
     routing: dict = {}
@@ -278,7 +275,6 @@ def investigate_stream(path: str, range_str: Optional[str]):
         # ============ Stage contributors: blame + scoring + timeline ============
         blame_data = _safe(f_blame, {"authors": [], "lines_by_author": {}}, "blame")
         blame = blame_data["authors"]
-        blame_lines = blame_data["lines_by_author"]
         commits = _safe(f_log, [], "log")
         commits_stats = _safe(f_stats, [], "commits_with_stats")
         first_author_data = _safe(f_first, {}, "first_author")
@@ -317,7 +313,7 @@ def investigate_stream(path: str, range_str: Optional[str]):
 
         # First pass: no PR-author bonus (open PRs not yet fetched). Re-runs in stage 3.
         contributors_scored, contributors = _build_contributors(
-            blame, commits_stats, first_author_data, set(), blame_lines, routing, _still_on_team
+            blame, commits_stats, first_author_data, set(), routing, _still_on_team
         )
 
         timeline_commits = commits[:5]
@@ -396,12 +392,14 @@ def investigate_stream(path: str, range_str: Optional[str]):
             jira_sources.append({"text": pr.get("branch", ""), "where": f"PR #{pr.get('number')} branch"})
         for c in commits[:10]:
             jira_sources.append({"text": c.get("subject", ""), "where": f"commit {c['sha'][:7]}"})
+        commit_bodies: dict[str, str] = {}
         if commits:
             with ThreadPoolExecutor(max_workers=10) as ex2:
                 body_futs = {c["sha"]: ex2.submit(git_ops.commit_body, c["sha"]) for c in commits[:10]}
             for sha, fut in body_futs.items():
                 body = _safe(fut, "", f"commit_body {sha[:7]}")
                 if body:
+                    commit_bodies[sha] = body
                     jira_sources.append({"text": body, "where": f"commit {sha[:7]} body"})
         jira_ids = jira_extract.extract(jira_sources)
 
@@ -411,7 +409,7 @@ def investigate_stream(path: str, range_str: Optional[str]):
         if open_prs:
             open_pr_authors = {pr["author"] for pr in open_prs if pr.get("author")}
             contributors_scored, contributors = _build_contributors(
-                blame, commits_stats, first_author_data, open_pr_authors, blame_lines, routing, _still_on_team
+                blame, commits_stats, first_author_data, open_pr_authors, routing, _still_on_team
             )
 
         github_payload = {
@@ -507,6 +505,16 @@ def investigate_stream(path: str, range_str: Optional[str]):
         yield github_payload
 
     # ============ Stage narrative: LLM call (slowest, runs after executor closes) ============
+    # File head: package decl, imports, doc comments, top-level types/functions.
+    # This is what gives the LLM something concrete to explain — without it, the
+    # narrative is all metadata and zero code-context.
+    file_head_text = ""
+    try:
+        fh = git_ops.read_file(path, max_bytes=12_000, max_lines=80)
+        file_head_text = "\n".join(fh.get("lines") or [])[:6000]
+    except Exception:
+        pass
+
     llm_signals = {
         "path": path,
         "range": range_str or "",
@@ -515,7 +523,16 @@ def investigate_stream(path: str, range_str: Optional[str]):
         "owners_rule": owners_match["rule"],
         "ownership_inferred": owners_match.get("inferred", False),
         "ownership_inferred_from": owners_match.get("inferred_from"),
-        "commits": [{"date": c["date"], "subject": c["subject"], "author": c["author"]} for c in commits[:5]],
+        "file_head": file_head_text,
+        "commits": [
+            {
+                "date": c["date"],
+                "subject": c["subject"],
+                "author": c["author"],
+                "body": (commit_bodies.get(c["sha"], "") or "")[:600],
+            }
+            for c in commits[:5]
+        ],
         "open_prs": open_prs[:3],
         "merged_prs_30d": [{"number": p["number"], "title": p["title"], "author": p["author"], "merged_at": p["updated_at"]} for p in merged_30["prs"][:3]],
         "merged_prs_30d_count": merged_30["count"],
@@ -545,6 +562,9 @@ def investigate_stream(path: str, range_str: Optional[str]):
     yield {
         "stage": "narrative",
         "summary": {"title": team_short, "copy": narrative["summary_copy"]},
+        "codePurpose": narrative.get("code_purpose", ""),
+        "recentContext": narrative.get("recent_context", ""),
+        "gotchas": narrative.get("gotchas", []),
         "activitySummary": narrative.get("activity_summary", ""),
         "timelineNotes": narrative.get("timeline_notes", []),
         "why": narrative["why"],
@@ -560,7 +580,8 @@ def investigate_stream(path: str, range_str: Optional[str]):
                 or ""
             ),
         },
-        "sources": {"llm_used": bool(narrative.get("summary_copy"))},
+        "model": narrative.get("model", ""),
+        "sources": {"llm_used": "(fallback)" not in (narrative.get("model") or "")},
     }
 
 

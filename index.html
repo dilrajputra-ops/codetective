@@ -315,7 +315,9 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   padding:2px 7px;border-radius:10px;background:var(--accent-bg);color:var(--accent);
   margin-left:8px;vertical-align:middle;letter-spacing:.02em}
 .ai-badge.pending{background:var(--bg);color:var(--faint);border:1px dashed var(--border-strong)}
+.ai-badge.offline{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
 .ai-badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block}
+.ai-badge.offline .dot{background:#b91c1c;box-shadow:0 0 0 2px rgba(185,28,28,0.15)}
 
 /* Toast */
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;
@@ -391,11 +393,15 @@ const state = {
   suggIdx: -1,
   prefetchTimer: null,
   prefetchInflight: new Set(),
+  modelName: "",      // populated from /health on init
 };
 
 // ---- result cache: in-memory mirror backed by IndexedDB (24h TTL, ~50MB quota) ----
+// Bump CACHE_SCHEMA whenever the investigation response shape changes; cached
+// entries from older schemas get evicted on next page load.
 const CACHE_MAX = 50;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_SCHEMA = 2;  // v2: added codePurpose, recentContext, gotchas, model
 const IDB_NAME = "codetective", IDB_VER = 1, IDB_STORE = "cases";
 
 function _idbOpen() {
@@ -442,7 +448,9 @@ async function loadCacheFromIdb() {
     const all = await _idbAll();
     let evicted = 0;
     for (const [k, v] of all) {
-      if (v && v._cachedAt && Date.now() - v._cachedAt < CACHE_TTL_MS) {
+      const fresh = v && v._cachedAt && Date.now() - v._cachedAt < CACHE_TTL_MS;
+      const sameSchema = v && v._schema === CACHE_SCHEMA;
+      if (fresh && sameSchema) {
         state.cache[k] = v;
       } else {
         _idbDel(k);
@@ -485,6 +493,7 @@ function cacheGet(path, range) {
 function cachePut(path, range, c) {
   c._stages = c._stages || {shell: true, contributors: true, github: true, narrative: true};
   c._cachedAt = Date.now();
+  c._schema = CACHE_SCHEMA;
   const k = cacheKey(path, range);
   state.cache[k] = c;
   const keys = Object.keys(state.cache);
@@ -578,6 +587,7 @@ async function loadHealth() {
     const r = await fetch("/health");
     const j = await r.json();
     if (j.vector_index === 0) $("reindex-link").textContent = "build index";
+    state.modelName = j.ollama?.model || "";
   } catch {}
 }
 
@@ -1164,6 +1174,10 @@ function withDefaults(c) {
     context: c.context || [],
     nextStep: c.nextStep || null,
     activitySummary: c.activitySummary || "",
+    codePurpose: c.codePurpose || "",
+    recentContext: c.recentContext || "",
+    gotchas: c.gotchas || [],
+    model: c.model || "",
     timelineNotes: c.timelineNotes || [],
     summary: { title: c.summary?.title || "Loading…", copy: c.summary?.copy || "" },
     team: {
@@ -1229,7 +1243,7 @@ function similarRailHtml(c) {
     </div>`).join("");
 }
 
-function headerActionsHtml(c) {
+function headerActionsHtml(c, stages) {
   const ghPath = `https://github.com/alpacahq/gobroker/blob/master/${c.path}${c.range?'#L'+c.range.split('-')[0]:''}`;
   return `
     <div>
@@ -1255,28 +1269,50 @@ function pillsRowHtml(c, stages) {
   const contribPill = stages.contributors
     ? `<span class="pill indigo">${c.contributors.length} contributors</span><span class="pill green">${c.timeline.length} commits shown</span>`
     : `<span class="pill loading-pill"><span class="mini-spin"></span>scanning blame…</span>`;
-  const llmPill = stages.narrative
-    ? (c.sources.llm_used?`<span class="pill gray">local llama</span>`:`<span class="pill gray">templated fallback</span>`)
-    : `<span class="pill loading-pill"><span class="mini-spin"></span>narrative…</span>`;
-  return `${contribPill}${ghPills}${c.range?`<span class="pill amber" title="Blame is restricted to these lines">lines ${esc(c.range)}</span>`:""}${c.team.inferred?`<span class="pill amber" title="No direct CODEOWNERS rule; inferred from ${esc(c.team.inferred_from||'parent')}">ownership inferred</span>`:""}${c.sources.codeowners?`<span class="pill gray">CODEOWNERS:${esc(c.sources.codeowners.split(":").pop())}</span>`:""}${stages.contributors?`<span class="pill gray">${c.sources.commits_scanned} commits scanned</span>`:""}${llmPill}`;
+  return `${contribPill}${ghPills}${c.range?`<span class="pill amber" title="Blame is restricted to these lines">lines ${esc(c.range)}</span>`:""}${c.team.inferred?`<span class="pill amber" title="No direct CODEOWNERS rule; inferred from ${esc(c.team.inferred_from||'parent')}">ownership inferred</span>`:""}${c.sources.codeowners?`<span class="pill gray">CODEOWNERS:${esc(c.sources.codeowners.split(":").pop())}</span>`:""}${stages.contributors?`<span class="pill gray">${c.sources.commits_scanned} commits scanned</span>`:""}`;
 }
 
 function tabsContribLabel(c, stages) { return `Contributors${stages.contributors?` (${c.contributors.length})`:""}`; }
 function tabsActivityLabel(c, stages) { return `Activity${stages.contributors?` (${c.timeline.length})`:""}`; }
 
 function aiBadgeHtml(c, stages, withTitle = true) {
+  const m = state.modelName || "local model";
   if (stages.narrative) {
-    return c.sources.llm_used
-      ? `<span class="ai-badge"${withTitle?` title="Generated locally by Llama 3.2 via Ollama"`:""}><span class="dot"></span>local llama</span>`
-      : `<span class="ai-badge pending"${withTitle?` title="Ollama unavailable — using deterministic template"`:""}>templated</span>`;
+    const online = c.sources?.llm_used;
+    return online
+      ? `<span class="ai-badge"${withTitle?` title="Generated locally by ${esc(m)} via Ollama — no code leaves your machine"`:""}><span class="dot"></span><span style="opacity:.65">local</span> · ${esc(m)}</span>`
+      : `<span class="ai-badge offline"${withTitle?` title="Ollama unreachable or timed out — narrative disabled. Start Ollama to enable code-context."`:""}><span class="dot"></span>local LLM offline</span>`;
   }
-  return `<span class="ai-badge pending"><span class="mini-spin" style="width:8px;height:8px;border-width:1.5px;margin:0 4px 0 0"></span>local llama…</span>`;
+  return `<span class="ai-badge pending"><span class="mini-spin" style="width:8px;height:8px;border-width:1.5px;margin:0 4px 0 0"></span><span style="opacity:.65">local</span> · thinking…</span>`;
 }
 
 function narrativeCardHtml(c, stages) {
-  return `<h3>Narrative ${aiBadgeHtml(c, stages)}</h3>${stages.narrative
-    ? `<p class="narrative">${esc(c.summary.copy)}</p>`
-    : loadingRow("Generating narrative summary…")}`;
+  const header = `<h3 style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span>Code context</span>${aiBadgeHtml(c, stages)}</h3>`;
+  if (!stages.narrative) {
+    return `${header}${loadingRow("Reading code + recent commits…")}`;
+  }
+  if (!c.sources?.llm_used) {
+    const modelHint = state.modelName || "qwen2.5-coder:7b";
+    return `
+      ${header}
+      <div class="rail-empty" style="padding:14px 12px;line-height:1.5">
+        <strong>No local LLM active.</strong><br>
+        Start Ollama and pull a model to see code-context narrative:
+        <code style="display:block;margin-top:8px;font-size:12px;color:var(--dim)">brew services start ollama && ollama pull ${esc(modelHint)}</code>
+      </div>`;
+  }
+  const purpose = (c.codePurpose || "").trim();
+  const recent = (c.recentContext || "").trim();
+  const gotchas = (c.gotchas || []).filter(Boolean);
+  if (!purpose && !recent && !gotchas.length) {
+    return `${header}<div class="rail-empty">No code-context narrative produced for this path.</div>`;
+  }
+  return `
+    ${header}
+    ${purpose ? `<p class="narrative"><strong style="color:var(--ink)">What it does.</strong> ${esc(purpose)}</p>` : ""}
+    ${recent ? `<p class="narrative" style="margin-top:8px"><strong style="color:var(--ink)">Recently.</strong> ${esc(recent)}</p>` : ""}
+    ${gotchas.length ? `<ul class="bullets" style="margin-top:10px">${gotchas.map(g => `<li>⚠ ${esc(g)}</li>`).join("")}</ul>` : ""}
+  `;
 }
 
 function topContribCardHtml(c, stages) {
@@ -1369,7 +1405,7 @@ function sourcesCardHtml(c, stages) {
 function renderShell(c, stages) {
   return `
     <div class="head-card">
-      <div class="head-row" id="sec-head-row">${headerActionsHtml(c)}</div>
+      <div class="head-row" id="sec-head-row">${headerActionsHtml(c, stages)}</div>
       <div class="team-line" id="sec-team-line">${teamLineHtml(c)}</div>
       <div class="pills" id="sec-pills">${pillsRowHtml(c, stages)}</div>
       <div id="sec-routing-strip">${routingStrip(c.routing)}</div>
@@ -1452,7 +1488,7 @@ function render(c, justArrived) {
   // (sec-team-line is updated unconditionally below since later stages can also
   // refine summary/team data.)
   if (!justArrived || justArrived === "shell") {
-    setHTML("sec-head-row", headerActionsHtml(c));
+    setHTML("sec-head-row", headerActionsHtml(c, stages));
     setHTML("sec-routing-strip", routingStrip(c.routing));
     setHTML("sec-routing", routingCardHtml(c));
     setHTML("sec-ownership-signals", ownershipSignalsCardHtml(c));
@@ -1474,6 +1510,7 @@ function render(c, justArrived) {
     setHTML("sec-evidence-wrap", evidenceWrapHtml(c, stages));
   }
   if (!justArrived || justArrived === "narrative") {
+    setHTML("sec-head-row", headerActionsHtml(c, stages));  // model name swaps in
     setHTML("sec-narrative", narrativeCardHtml(c, stages));
     setHTML("sec-next-step", nextStepCardHtml(c, stages));
     setHTML("sec-activity-summary", activitySummaryCardHtml(c, stages));
@@ -1512,8 +1549,6 @@ function contribOverview(p) {
 }
 
 function contribCard(p,i) {
-  const sid = `sn-${i}`;
-  const hasSnippets = p.snippets && p.snippets.length;
   const cls = "contrib-card" + ((p.is_departed || p.status === "departed") ? " departed" : "");
   let badge = "";
   if (p.status === "departed")    badge = `<span class="contrib-badge left">Left Alpaca</span>`;
@@ -1526,14 +1561,7 @@ function contribCard(p,i) {
         <div class="contrib-role">${esc(p.role)}${scorePill(p)} · ${esc(p.when)}</div>
       </div>
       <div class="contrib-stats">${p.lines||0} lines</div>
-      ${hasSnippets ? `<span class="contrib-toggle" onclick="document.getElementById('${sid}').classList.toggle('on')">show lines</span>` : ""}
     </div>
-    ${hasSnippets ? `<div id="${sid}" class="snippets">${p.snippets.map(s => `
-      <div class="snippet-row">
-        <span class="sn-num">${s.line_no}</span>
-        <span class="sn-sha">${esc(s.sha)}</span>
-        <span class="sn-code">${esc(s.code)}</span>
-      </div>`).join("")}</div>` : ""}
   </div>`;
 }
 

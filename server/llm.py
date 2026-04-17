@@ -20,48 +20,53 @@ LLM_CACHE_DIR = CACHE_DIR / "llm"
 LLM_CACHE_TTL_SECONDS = 3600
 
 SYSTEM = (
-    "You are Codemap, a code-context tool. Given structured signals about a file path "
-    "in the gobroker monorepo, produce SHORT narrative for an engineer who needs to "
-    "know who owns it and what to do next. Return strict JSON only.\n\n"
-    "ANTI-HALLUCINATION (most important):\n"
-    "- NEVER invent PR numbers, commit SHAs, URLs, names, Jira IDs, or any identifier. "
-    "  Use ONLY values present in the input signals. If a field would require a value you "
-    "  don't have, omit it (empty string) — do NOT make one up.\n"
-    "- If open_prs is empty, do NOT pretend there's an open PR. Pick a different next_step "
-    "  (latest_commit, top_merged_pr, or routing.slack/docs).\n"
-    "- next_step.url MUST be copied verbatim from one of: open_prs[].url, latest_commit.url, "
-    "  merged_prs_30d[].url, latest_pr.url, routing.docs, or jira[].url. Never assemble URLs.\n\n"
+    "You are Codemap. Given a file path's code head and recent commits, write a "
+    "SHORT engineer-to-engineer briefing on what the file does and what changed lately. "
+    "Return strict JSON only.\n\n"
+    "PRIMARY OUTPUTS — these are what an engineer actually wants:\n"
+    "- code_purpose: What this file does, derived from `file_head` (package decl, doc comments, "
+    "  type/struct names, function signatures). Be CONCRETE about identifiers — name the actual "
+    "  types/functions defined. If file_head is empty or non-code (yaml/json), describe what the "
+    "  config controls based on its keys.\n"
+    "- recent_context: What's been happening lately, derived from commit subjects + bodies. "
+    "  Group themes ('error handling cleanup', 'TWAP/VWAP support', 'feature-flag rollout'); "
+    "  don't just rephrase one commit. Reference Jira IDs from subjects when present.\n"
+    "- gotchas: Up to 3 short bullets surfacing non-obvious behavior or constraints found in "
+    "  code comments (TODO/FIXME/NOTE/HACK/WARNING) or commit bodies (rollback notes, gotchas, "
+    "  follow-ups). Empty array if nothing notable — do NOT pad with generic advice.\n\n"
+    "ANTI-HALLUCINATION (strict):\n"
+    "- NEVER invent type names, function names, PR numbers, SHAs, URLs, or identifiers. "
+    "  Only reference symbols literally present in file_head or signals.\n"
+    "- If file_head is empty, say 'No source preview available' for code_purpose — do NOT guess.\n"
+    "- next_step.url MUST be copied verbatim from open_prs[].url, latest_commit url, "
+    "  merged_prs_30d[].url, or jira[].url. Never assemble URLs.\n"
+    "- If open_prs is empty, pick a different next_step — do NOT invent a PR.\n\n"
+    "SECONDARY OUTPUTS (terse, optional):\n"
+    "- summary_copy: 1 sentence: '<team_short> owns this. <one-clause about activity>.'\n"
+    "- activity_summary: 1 sentence (<=22 words) on cadence — open vs merged counts.\n"
+    "- timeline_notes: one plain-English sentence per commit in commits[], same order, "
+    "  describing engineering intent (skip author names).\n"
+    "- why: up to 3 bullets if there's something genuinely useful to say about routing; "
+    "  otherwise leave the array empty.\n"
+    "- next_step: only if there's an obvious one (open PR to review, etc.); skip otherwise.\n\n"
     "OWNERSHIP:\n"
-    "- NEVER say the file is 'Unowned' as if that's the answer. If owners is empty, "
-    "  describe recent activity using top_contributors and commit subjects.\n"
-    "- If ownership_inferred is true, say 'likely owned by X (inferred from parent dir)'.\n"
-    "- If ownership_inferred is false, do NOT mention inference, parent dirs, or guessing — "
-    "  CODEOWNERS routes the path directly.\n\n"
-    "GROUNDING:\n"
-    "- Ground every claim in a signal. No filler. No generic advice ('consider opening a PR').\n"
-    "- If routing.slack_primary is set, mention it as the place to ask.\n"
-    "- Prefer top_contributors with still_on_team=true when suggesting who to ping; "
-    "  warn if the largest blame share has status='departed' or still_on_team=false.\n"
-    "- Use merged_prs_30d_count and merged_prs_90d_count to characterize churn: "
-    "  '0 open / 0 merged 90d' = stale; '0 open / 4 merged 30d' = quiet but actively maintained.\n\n"
-    "TIMELINE_NOTES:\n"
-    "- Write ONE short plain-English sentence per commit in commits[], in the SAME ORDER. "
-    "  Describe engineering intent, not just rephrasing the subject. Reference Jira IDs when "
-    "  present in the subject. Skip the author name."
+    "- If ownership_inferred is true, mention 'inferred from parent dir' once.\n"
+    "- If ownership_inferred is false, do NOT mention inference — CODEOWNERS is direct."
 )
 
 SCHEMA_HINT = {
-    "summary_copy": "1-2 sentences on recent activity in this area, grounded in the signals.",
-    "activity_summary": "1 sentence (<= 22 words) on what's happening in this area lately: themes across recent commits, open PRs, and merge cadence. Plain English.",
-    "timeline_notes": [
-        "Array, one entry per commit in commits[] in the same order. Each is a short plain-English sentence (<= 18 words) describing what that commit did and why."
-    ],
-    "why": ["3 short bullets explaining why this team is the right first stop."],
+    "code_purpose": "2-3 sentences on what this file does and why it exists, grounded in file_head identifiers and doc comments.",
+    "recent_context": "1-2 sentences on themes across recent commits — what changed, why, any in-flight work.",
+    "gotchas": ["Up to 3 short bullets on non-obvious behavior found in comments or commit bodies. Empty if none."],
+    "summary_copy": "1 sentence on owner + headline activity.",
+    "activity_summary": "1 sentence on merge/open cadence.",
+    "timeline_notes": ["One sentence per commit in commits[], same order."],
+    "why": ["Optional: bullets about why this team owns the area. Empty array is fine."],
     "next_step": {
-        "title": "short imperative title — e.g. 'Read latest commit', 'Review open PR', 'Ping #eng-payments'. NO placeholder numbers.",
-        "copy": "1 sentence on why this is the right next step, grounded in a signal.",
-        "link_label": "short label like 'Open PR' or 'View commit'",
-        "url": "MUST be a URL copied verbatim from the input signals — never fabricated.",
+        "title": "short imperative — 'Read latest commit', 'Review open PR', 'Ping #eng-payments'. No placeholder numbers.",
+        "copy": "1 sentence on why, grounded in a signal.",
+        "link_label": "short label",
+        "url": "URL copied verbatim from signals; empty string if none fits.",
     },
 }
 
@@ -146,7 +151,13 @@ def _fallback(signals: dict) -> dict:
         for c in commits[:8]
     ]
 
+    # Code-context fields are LLM-only. Without an active local LLM, we deliberately
+    # leave these empty rather than fake it with raw signal dumps — the UI shows an
+    # explicit "no local LLM" empty state instead.
     return {
+        "code_purpose": "",
+        "recent_context": "",
+        "gotchas": [],
         "summary_copy": summary,
         "activity_summary": activity_summary,
         "timeline_notes": timeline_notes,
@@ -160,16 +171,16 @@ def _fallback(signals: dict) -> dict:
     }
 
 
-def _ollama_chat(messages: list[dict], timeout: float = 45.0) -> str | None:
-    # 45s covers cold model load (~11s for 7B) + generation (~3s warm, ~10s cold).
-    # Subsequent warm calls finish in 2-3s; cache short-circuits identical payloads.
+def _ollama_chat(messages: list[dict], timeout: float = 90.0) -> str | None:
+    # 90s headroom: 7B-class models can take ~30-40s cold with the larger code-context
+    # prompt (file_head + commit bodies). Warm calls finish in ~10-15s; cache hides repeats.
     body = json.dumps(
         {
             "model": OLLAMA_MODEL,
             "messages": messages,
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0.2, "num_predict": 400},
+            "options": {"temperature": 0.2, "num_predict": 600},
         }
     ).encode()
     req = urllib.request.Request(
@@ -223,16 +234,25 @@ def synthesize(signals: dict) -> dict:
     )
     if not raw:
         out = _fallback(signals)
+        out["model"] = f"{OLLAMA_MODEL} (fallback)"
         _cache_write(key, out)
         return out
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
         out = _fallback(signals)
+        out["model"] = f"{OLLAMA_MODEL} (fallback)"
         _cache_write(key, out)
         return out
 
     out = _fallback(signals)
+    if isinstance(data.get("code_purpose"), str) and data["code_purpose"].strip():
+        out["code_purpose"] = data["code_purpose"].strip()
+    if isinstance(data.get("recent_context"), str) and data["recent_context"].strip():
+        out["recent_context"] = data["recent_context"].strip()
+    if isinstance(data.get("gotchas"), list):
+        gotchas = [str(x).strip() for x in data["gotchas"] if str(x).strip()][:3]
+        out["gotchas"] = gotchas
     if isinstance(data.get("summary_copy"), str) and data["summary_copy"].strip():
         out["summary_copy"] = data["summary_copy"].strip()
     if isinstance(data.get("activity_summary"), str) and data["activity_summary"].strip():
@@ -245,12 +265,13 @@ def synthesize(signals: dict) -> dict:
             if len(notes) < n_expected:
                 notes = notes + out["timeline_notes"][len(notes):n_expected]
             out["timeline_notes"] = notes[:max(n_expected, len(notes))]
-    if isinstance(data.get("why"), list) and data["why"]:
-        out["why"] = [str(x).strip() for x in data["why"] if str(x).strip()][:5] or out["why"]
+    if isinstance(data.get("why"), list):
+        out["why"] = [str(x).strip() for x in data["why"] if str(x).strip()][:5]
     if isinstance(data.get("next_step"), dict):
         ns = data["next_step"]
         for k in ("title", "copy", "link_label", "url"):
             if isinstance(ns.get(k), str) and ns[k].strip():
                 out["next_step"][k] = ns[k].strip()
+    out["model"] = OLLAMA_MODEL
     _cache_write(key, out)
     return out
