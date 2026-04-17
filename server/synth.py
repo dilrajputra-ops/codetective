@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from . import codeowners, gh_client, git_ops, jira_extract, llm, vectors
+from . import codeowners, employees, gh_client, git_ops, jira_extract, llm, owners_map, vectors
 
 PALETTE = ["#6366f1", "#2563eb", "#7c3aed", "#0891b2", "#059669", "#db2777"]
 
@@ -113,29 +113,63 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
     else:
         confidence = _confidence(owners_match["owners"], commits_30d)
 
-    # Contributors: top 3 by blame lines, with deterministic role tags
+    # Routing info for the owning team (auto-fetched + manual overrides).
+    routing = (
+        owners_map.lookup(owners_match["owners"][0])
+        if owners_match["owners"]
+        else {}
+    )
+    # Build "still on the owning team?" lookup. Match by full name; GH login isn't in blame.
+    team_member_names = {
+        (m.get("login") or "").lower() for m in (routing.get("members") or [])
+    }
+    # Github usernames don't always match git author names, so we also check the
+    # noreply email pattern: 12345+login@users.noreply.github.com
+    def _still_on_team(name: str, email: str) -> bool:
+        if not team_member_names:
+            return False
+        n = (name or "").lower().replace(" ", "")
+        if any(login and (login in n or n in login) for login in team_member_names):
+            return True
+        em = (email or "").lower()
+        if "+" in em and "@users.noreply.github.com" in em:
+            login = em.split("+", 1)[1].split("@", 1)[0]
+            if login in team_member_names:
+                return True
+        return False
+
+    # Contributors: top 5 by blame lines, with deterministic role tags + status.
     open_pr_authors = {pr["author"] for pr in open_prs if pr.get("author")}
     top_blame = blame[:5]
     contributors = []
     for i, b in enumerate(top_blame):
         name = b["name"]
-        if name in open_pr_authors:
+        email = b.get("email", "")
+        emp_status = employees.status(name, email)
+        on_team = _still_on_team(name, email)
+        if emp_status == "departed":
+            role = "Left Alpaca"
+        elif on_team:
+            role = f"Current {routing.get('team_name','team')} member"
+        elif name in open_pr_authors:
             role = "Open PR owner"
         elif i == 0:
             role = "Largest blame share"
         else:
             role = "Recent committer"
-        key = b.get("email") or name
+        key = email or name
         contributors.append(
             {
                 "name": name,
-                "email": b.get("email", ""),
+                "email": email,
                 "initials": _initials(name),
                 "color": PALETTE[i % len(PALETTE)],
                 "role": role,
                 "when": _ago(b["last_date"]),
                 "lines": b["lines"],
                 "snippets": blame_lines.get(key, [])[:5],
+                "status": emp_status,           # active | departed | unknown
+                "still_on_team": on_team,
             }
         )
 
@@ -163,7 +197,25 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
         "commits": [{"date": c["date"], "subject": c["subject"], "author": c["author"]} for c in commits[:8]],
         "open_prs": open_prs[:3],
         "jira": jira_ids[:3],
-        "top_contributors": [{"name": b["name"], "lines": b["lines"]} for b in top_blame],
+        "top_contributors": [
+            {
+                "name": b["name"],
+                "lines": b["lines"],
+                "status": contributors[i]["status"],
+                "still_on_team": contributors[i]["still_on_team"],
+            }
+            for i, b in enumerate(top_blame)
+        ],
+        "current_team_members": [
+            (m.get("login") or "")
+            for m in (routing.get("members") or [])
+        ][:20],
+        "routing": {
+            "team_name": routing.get("team_name"),
+            "slack_primary": (routing.get("slack") or {}).get("primary"),
+            "on_call": routing.get("on_call"),
+            "escalation": routing.get("escalation"),
+        },
     }
     narrative = llm.synthesize(llm_signals)
 
@@ -220,6 +272,7 @@ def investigate(path: str, range_str: Optional[str]) -> dict:
             else None
         ),
         "contributors": contributors,
+        "routing": routing,
         "timeline": timeline,
         "why": narrative["why"],
         "context": [

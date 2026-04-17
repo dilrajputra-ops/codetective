@@ -1,96 +1,17 @@
 {
-  "_doc": "Codemap routing map: CODEOWNERS team slug -> human routing info. Fill in what you know; missing/empty fields just won't render. Required: nothing. Recommended: team_name, slack.",
+  "_doc": "Codemap manual overrides for CODEOWNERS team slugs. Auto-fetched fields (team_name, slack channels, GH members) come from gh_teams.py + slack_channels.json. This file ONLY holds info no API can give us: on_call, escalation, docs. Empty entries are fine; the team simply won't show those fields. Add an entry when you know the on-call rotation, escalation contact, or canonical docs URL for a team.",
 
-  "@alpacahq/admin": {
-    "team_name": "Admin",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/applications": {
-    "team_name": "Applications",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/clearing": {
-    "team_name": "Clearing",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/crypto": {
-    "team_name": "Crypto",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/devops": {
-    "team_name": "DevOps",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/gobroker-db-reviewer": {
-    "team_name": "Gobroker DB Reviewer",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": "",
-    "note": "Review-only group, not a service owner."
-  },
-  "@alpacahq/identity": {
-    "team_name": "Identity",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/ledger": {
-    "team_name": "Ledger",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/market-data": {
-    "team_name": "Market Data",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/payments": {
-    "team_name": "Payments",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/platform-api": {
-    "team_name": "Platform API",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/tax": {
-    "team_name": "Tax",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  },
-  "@alpacahq/trading": {
-    "team_name": "Trading",
-    "slack": "",
-    "on_call": "",
-    "escalation": "",
-    "docs": ""
-  }
+  "@alpacahq/admin":                  { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/applications":           { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/clearing":               { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/crypto":                 { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/devops":                 { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/gobroker-db-reviewer":   { "on_call": "", "escalation": "", "docs": "", "_note": "Review-only group, not a service owner." },
+  "@alpacahq/identity":               { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/ledger":                 { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/market-data":            { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/payments":               { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/platform-api":           { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/tax":                    { "on_call": "", "escalation": "", "docs": "" },
+  "@alpacahq/trading":                { "on_call": "", "escalation": "", "docs": "" }
 }

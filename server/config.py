@@ -24,6 +24,10 @@ VECTOR_DB = Path(os.environ.get("VECTOR_DB", "/tmp/codemap-vectors.sqlite"))
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 OWNERS_FILE = Path(os.environ.get("OWNERS_FILE", _REPO_ROOT / "owners.json"))
 DEPARTED_FILE = Path(os.environ.get("DEPARTED_FILE", _REPO_ROOT / "departed.txt"))
+SLACK_CHANNELS_FILE = Path(os.environ.get("SLACK_CHANNELS_FILE", _REPO_ROOT / "slack_channels.json"))
+GH_TEAMS_CACHE = Path(os.environ.get("GH_TEAMS_CACHE", "/tmp/codemap-gh-teams.json"))
+GH_TEAMS_TTL_SECONDS = int(os.environ.get("GH_TEAMS_TTL_SECONDS", str(24 * 3600)))
+GH_ORG = os.environ.get("GH_ORG", "alpacahq")
 
 # Merged-PR lookback windows (days).
 MERGED_WINDOWS_DAYS = (30, 90)

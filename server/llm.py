@@ -18,7 +18,11 @@ SYSTEM = (
     "- NEVER say the file is 'Unowned' as if that's the answer. If owners is empty, "
     "  describe the actual recent activity using top_contributors and commit subjects.\n"
     "- If ownership_inferred is true, say 'likely owned by X (inferred from parent dir)'.\n"
-    "- Ground every claim in a signal. No filler."
+    "- Ground every claim in a signal. No filler.\n"
+    "- If routing.slack_primary is set, mention it as the place to ask.\n"
+    "- Prefer top_contributors with still_on_team=true when suggesting who to ping; "
+    "  warn if the largest blame share has status='departed' or still_on_team=false "
+    "  (someone who left the team or company)."
 )
 
 SCHEMA_HINT = {

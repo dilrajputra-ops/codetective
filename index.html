@@ -200,6 +200,37 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .next-copy{font-size:12.5px;color:var(--dim);line-height:1.55}
 .next-link{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:600;color:var(--accent)}
 
+/* Routing strip + block */
+.routing-strip{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px;font-size:12px;color:var(--dim)}
+.routing-strip .rt{display:inline-flex;align-items:center;gap:5px;background:var(--bg);
+  padding:4px 10px;border-radius:14px;border:1px solid var(--border);transition:all .12s}
+.routing-strip .rt.clickable{cursor:pointer}
+.routing-strip .rt.clickable:hover{border-color:var(--accent);color:var(--accent)}
+.routing-strip .rt-key{font-weight:600;font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+.routing-strip .rt-val{font-family:"SF Mono",ui-monospace,monospace;font-size:11.5px;color:var(--text)}
+.routing-strip .rt.clickable:hover .rt-val{color:var(--accent)}
+.routing-strip .rt-empty{color:var(--faint);font-style:italic;font-size:11px;padding:4px 0}
+
+.routing-block{display:grid;grid-template-columns:120px 1fr;gap:8px 14px;font-size:12.5px;align-items:baseline}
+.routing-block dt{color:var(--faint);font-weight:600;font-size:11.5px}
+.routing-block dd a{color:var(--accent)}
+.routing-block .rb-chip{display:inline-block;background:var(--bg);padding:2px 8px;border-radius:5px;
+  font-family:"SF Mono",ui-monospace,monospace;font-size:11.5px;margin-right:4px;cursor:pointer}
+.routing-block .rb-chip:hover{background:var(--accent-bg);color:var(--accent)}
+.routing-block .rb-empty{color:var(--faint);font-style:italic}
+
+/* Contributor status badges + dots */
+.contrib-card.departed{opacity:.55}
+.contrib-card.departed .contrib-name{text-decoration:line-through;text-decoration-color:var(--faint)}
+.contrib-badge{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+  padding:2px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
+.contrib-badge.left{background:#fee2e2;color:#991b1b}
+.contrib-badge.team{background:var(--green-bg);color:var(--green)}
+.av-wrap{position:relative;flex-shrink:0}
+.av-dot{position:absolute;bottom:-1px;right:-1px;width:11px;height:11px;border-radius:50%;
+  background:var(--green);border:2px solid var(--surface)}
+.av-dot.bg{background:var(--bg)}
+
 .sources-mono{font-family:"SF Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);
   padding:8px 10px;background:var(--bg);border-radius:6px;margin-top:8px}
 
@@ -433,6 +464,48 @@ function copyLink() {
   navigator.clipboard.writeText(location.href).then(()=>toast("Link copied"));
 }
 
+function copyText(text, label) {
+  navigator.clipboard.writeText(text).then(()=>toast(`Copied: ${label||text}`));
+}
+
+// ---- routing strip + block ----
+function routingStrip(r) {
+  if (!r || !r.team_name) return "";
+  const s = r.slack || {};
+  const items = [];
+  if (s.primary)   items.push(`<span class="rt clickable" onclick="copyText('${esc(s.primary)}','channel')" title="Click to copy"><span class="rt-key">slack</span><span class="rt-val">${esc(s.primary)}</span></span>`);
+  if (s.alerts)    items.push(`<span class="rt clickable" onclick="copyText('${esc(s.alerts)}','channel')" title="Click to copy"><span class="rt-key">alerts</span><span class="rt-val">${esc(s.alerts)}</span></span>`);
+  if (s.errors)    items.push(`<span class="rt clickable" onclick="copyText('${esc(s.errors)}','channel')" title="Click to copy"><span class="rt-key">errors</span><span class="rt-val">${esc(s.errors)}</span></span>`);
+  if (r.on_call)   items.push(`<span class="rt"><span class="rt-key">on-call</span><span class="rt-val">${esc(r.on_call)}</span></span>`);
+  if (r.escalation) items.push(`<span class="rt"><span class="rt-key">escalate</span><span class="rt-val">${esc(r.escalation)}</span></span>`);
+  if (r.docs)      items.push(`<span class="rt clickable" onclick="window.open('${esc(r.docs)}','_blank')"><span class="rt-key">docs</span><span class="rt-val">↗</span></span>`);
+  if (r.github_url) items.push(`<span class="rt clickable" onclick="window.open('${esc(r.github_url)}','_blank')"><span class="rt-key">gh team</span><span class="rt-val">${r.members_count||"?"} members ↗</span></span>`);
+  if (!items.length) return "";
+  return `<div class="routing-strip">${items.join("")}</div>`;
+}
+
+function routingBlock(r) {
+  if (!r || !r.team_name) return `<div class="rb-empty">No routing data for this team.</div>`;
+  const s = r.slack || {};
+  const slackBits = [s.primary, s.alerts, s.errors, ...(s.extra||[])].filter(Boolean);
+  const slackHtml = slackBits.length
+    ? slackBits.map(ch => `<span class="rb-chip" onclick="copyText('${esc(ch)}','channel')">${esc(ch)}</span>`).join("")
+    : `<span class="rb-empty">No Slack channels mapped.</span>`;
+  const onCall = r.on_call || `<span class="rb-empty">Not set in owners.json</span>`;
+  const escal  = r.escalation || `<span class="rb-empty">Not set in owners.json</span>`;
+  const docs   = r.docs ? `<a href="${esc(r.docs)}" target="_blank">${esc(r.docs)} ↗</a>` : `<span class="rb-empty">Not set in owners.json</span>`;
+  const gh     = r.github_url ? `<a href="${esc(r.github_url)}" target="_blank">${esc(r.team_name)} (${r.members_count||"?"} members) ↗</a>` : `<span class="rb-empty">Unknown</span>`;
+  const noteHtml = r.note ? `<dt>Note</dt><dd>${esc(r.note)}</dd>` : "";
+  return `<dl class="routing-block">
+    <dt>Team</dt><dd>${gh}${r.parent_team?` <span style="color:var(--faint)">· parent: ${esc(r.parent_team)}</span>`:""}</dd>
+    <dt>Slack</dt><dd>${slackHtml}</dd>
+    <dt>On-call</dt><dd>${onCall}</dd>
+    <dt>Escalation</dt><dd>${escal}</dd>
+    <dt>Docs</dt><dd>${docs}</dd>
+    ${noteHtml}
+  </dl>`;
+}
+
 // ---- investigate ----
 async function investigate({ skipPush=false } = {}) {
   if (state.busy) return;
@@ -523,6 +596,7 @@ function render(c) {
         ${c.sources.llm_used?`<span class="pill gray">local llama</span>`:""}
         ${c.sources.gh_degraded?`<span class="pill rose">gh degraded</span>`:""}
       </div>
+      ${routingStrip(c.routing)}
     </div>
 
     <div class="tabs">
@@ -591,6 +665,10 @@ function render(c) {
 
     <div class="tab-body" data-tab="why">
       <div class="card">
+        <h3>How to reach this team</h3>
+        ${routingBlock(c.routing)}
+      </div>
+      <div class="card">
         <h3>Why this team</h3>
         <ul class="bullets">${c.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
       </div>
@@ -630,11 +708,15 @@ function contribOverview(p) {
 function contribCard(p,i) {
   const sid = `sn-${i}`;
   const hasSnippets = p.snippets && p.snippets.length;
-  return `<div class="contrib-card">
+  const cardClass = p.status === "departed" ? "contrib-card departed" : "contrib-card";
+  let badge = "";
+  if (p.status === "departed") badge = `<span class="contrib-badge left">Left Alpaca</span>`;
+  else if (p.still_on_team)    badge = `<span class="contrib-badge team">Current member</span>`;
+  return `<div class="${cardClass}">
     <div class="contrib-head">
       ${avatar(p)}
       <div class="contrib-meta">
-        <div class="contrib-name">${esc(p.name)}</div>
+        <div class="contrib-name">${esc(p.name)}${badge}</div>
         <div class="contrib-role">${esc(p.role)} · ${esc(p.when)}</div>
       </div>
       <div class="contrib-stats">${p.lines||0} lines</div>
@@ -650,7 +732,10 @@ function contribCard(p,i) {
 }
 
 function avatar(p) {
-  return `<div class="av" style="background:${esc(p.color)}">${esc(p.initials)}</div>`;
+  const dot = p.still_on_team ? `<span class="av-dot" title="Still on the owning team"></span>`
+            : p.status === "departed" ? `<span class="av-dot bg" title="Left Alpaca" style="background:#9ca3af"></span>`
+            : "";
+  return `<div class="av-wrap"><div class="av" style="background:${esc(p.color)}">${esc(p.initials)}</div>${dot}</div>`;
 }
 
 function workItem(w, kind) {
