@@ -23,20 +23,31 @@ SYSTEM = (
     "You are Codemap, a code-context tool. Given structured signals about a file path "
     "in the gobroker monorepo, produce SHORT narrative for an engineer who needs to "
     "know who owns it and what to do next. Return strict JSON only.\n\n"
-    "Rules:\n"
+    "ANTI-HALLUCINATION (most important):\n"
+    "- NEVER invent PR numbers, commit SHAs, URLs, names, Jira IDs, or any identifier. "
+    "  Use ONLY values present in the input signals. If a field would require a value you "
+    "  don't have, omit it (empty string) — do NOT make one up.\n"
+    "- If open_prs is empty, do NOT pretend there's an open PR. Pick a different next_step "
+    "  (latest_commit, top_merged_pr, or routing.slack/docs).\n"
+    "- next_step.url MUST be copied verbatim from one of: open_prs[].url, latest_commit.url, "
+    "  merged_prs_30d[].url, latest_pr.url, routing.docs, or jira[].url. Never assemble URLs.\n\n"
+    "OWNERSHIP:\n"
     "- NEVER say the file is 'Unowned' as if that's the answer. If owners is empty, "
-    "  describe the actual recent activity using top_contributors and commit subjects.\n"
+    "  describe recent activity using top_contributors and commit subjects.\n"
     "- If ownership_inferred is true, say 'likely owned by X (inferred from parent dir)'.\n"
-    "- Ground every claim in a signal. No filler.\n"
+    "- If ownership_inferred is false, do NOT mention inference, parent dirs, or guessing — "
+    "  CODEOWNERS routes the path directly.\n\n"
+    "GROUNDING:\n"
+    "- Ground every claim in a signal. No filler. No generic advice ('consider opening a PR').\n"
     "- If routing.slack_primary is set, mention it as the place to ask.\n"
     "- Prefer top_contributors with still_on_team=true when suggesting who to ping; "
-    "  warn if the largest blame share has status='departed' or still_on_team=false "
-    "  (someone who left the team or company).\n"
+    "  warn if the largest blame share has status='departed' or still_on_team=false.\n"
     "- Use merged_prs_30d_count and merged_prs_90d_count to characterize churn: "
-    "  '0 open / 0 merged 90d' = stale; '0 open / 4 merged 30d' = quiet right now but actively maintained.\n"
-    "- For timeline_notes: write ONE short plain-English sentence per commit in commits[], "
-    "  in the SAME ORDER. Describe the engineering intent, not just rephrasing the subject. "
-    "  Reference Jira IDs when present in the subject. Skip the author name."
+    "  '0 open / 0 merged 90d' = stale; '0 open / 4 merged 30d' = quiet but actively maintained.\n\n"
+    "TIMELINE_NOTES:\n"
+    "- Write ONE short plain-English sentence per commit in commits[], in the SAME ORDER. "
+    "  Describe engineering intent, not just rephrasing the subject. Reference Jira IDs when "
+    "  present in the subject. Skip the author name."
 )
 
 SCHEMA_HINT = {
@@ -47,10 +58,10 @@ SCHEMA_HINT = {
     ],
     "why": ["3 short bullets explaining why this team is the right first stop."],
     "next_step": {
-        "title": "short imperative title (e.g. 'Open PR #123 first')",
-        "copy": "1 sentence on why",
-        "link_label": "e.g. 'Open pull request'",
-        "url": "best URL to start with",
+        "title": "short imperative title — e.g. 'Read latest commit', 'Review open PR', 'Ping #eng-payments'. NO placeholder numbers.",
+        "copy": "1 sentence on why this is the right next step, grounded in a signal.",
+        "link_label": "short label like 'Open PR' or 'View commit'",
+        "url": "MUST be a URL copied verbatim from the input signals — never fabricated.",
     },
 }
 
@@ -149,7 +160,9 @@ def _fallback(signals: dict) -> dict:
     }
 
 
-def _ollama_chat(messages: list[dict], timeout: float = 8.0) -> str | None:
+def _ollama_chat(messages: list[dict], timeout: float = 45.0) -> str | None:
+    # 45s covers cold model load (~11s for 7B) + generation (~3s warm, ~10s cold).
+    # Subsequent warm calls finish in 2-3s; cache short-circuits identical payloads.
     body = json.dumps(
         {
             "model": OLLAMA_MODEL,
@@ -207,7 +220,6 @@ def synthesize(signals: dict) -> dict:
     user = json.dumps({"signals": signals, "output_schema": SCHEMA_HINT}, default=str)[:8000]
     raw = _ollama_chat(
         [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
-        timeout=8.0,
     )
     if not raw:
         out = _fallback(signals)
