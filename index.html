@@ -158,11 +158,33 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .pane{overflow-y:auto;background:var(--bg)}
 .pane-inner{max-width:1100px;padding:24px 32px 80px}
 
-.empty-state{display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);
-  font-size:14px;text-align:center;padding:40px}
-.empty-state .em-card{max-width:440px}
-.empty-state h2{font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:-.02em}
-.empty-state p{font-size:13px;line-height:1.7;color:var(--dim)}
+.empty-state{display:flex;align-items:center;justify-content:center;min-height:100%;padding:48px 32px}
+.empty-state .em-card{max-width:640px;text-align:center}
+.empty-state .em-eyebrow{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.18em;
+  color:var(--alpaca-gold);margin-bottom:14px}
+.empty-state h2{font-size:28px;font-weight:800;color:var(--text);margin-bottom:12px;
+  letter-spacing:-.025em;line-height:1.15}
+.empty-state .em-quote{font-size:14.5px;font-style:italic;color:var(--dim);line-height:1.55;
+  margin-bottom:32px;font-weight:500}
+.empty-state .em-quote::before{content:"\201C";color:var(--alpaca-gold);font-weight:700;margin-right:2px}
+.empty-state .em-quote::after{content:"\201D";color:var(--alpaca-gold);font-weight:700;margin-left:2px}
+.empty-state .em-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:26px}
+.empty-state .em-action{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px 14px 12px;text-align:left;cursor:pointer;transition:.14s;display:flex;flex-direction:column;
+  gap:4px;font-family:inherit}
+.empty-state .em-action:hover{border-color:var(--alpaca-gold);background:var(--alpaca-yellow-soft);
+  transform:translateY(-1px);box-shadow:0 4px 12px rgba(184,132,26,.10)}
+.empty-state .em-action-icon{font-size:16px;margin-bottom:2px}
+.empty-state .em-action-title{font-size:12.5px;font-weight:700;color:var(--text);letter-spacing:-.005em}
+.empty-state .em-action-sub{font-size:11px;color:var(--faint);line-height:1.45}
+.empty-state .em-tries{font-size:11px;color:var(--faint);margin-bottom:10px;letter-spacing:.04em;text-transform:uppercase;font-weight:700}
+.empty-state .em-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.empty-state .em-chip{background:var(--bg);border:1px solid var(--border);border-radius:999px;
+  padding:5px 11px;font-size:11.5px;color:var(--dim);font-family:"SF Mono",ui-monospace,monospace;
+  cursor:pointer;transition:.12s}
+.empty-state .em-chip:hover{border-color:var(--alpaca-gold);color:var(--text);background:var(--alpaca-yellow-soft)}
+.empty-state .em-foot{margin-top:28px;font-size:11px;color:var(--faint);line-height:1.6}
+.empty-state .em-foot .em-dot{color:var(--alpaca-gold);margin:0 6px}
 
 /* Loading */
 .loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--dim);font-size:13px}
@@ -533,8 +555,41 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
   <div id="top-progress" class="top-progress"></div>
   <div id="pane-body" class="pane-inner">
     <div class="empty-state"><div class="em-card">
-      <h2>Paste a path. See who owns it.</h2>
-      <p>Codetective reads CODEOWNERS, git history, open PRs, and Jira mentions to give you a complete file context in seconds. Local-only — nothing leaves this machine.</p>
+      <div class="em-eyebrow">Local · Private · Deterministic</div>
+      <h2>Investigate any file in gobroker.</h2>
+      <div class="em-quote">One small path for an engineer, one giant leap into unfamiliar code.</div>
+
+      <div class="em-actions">
+        <button class="em-action" onclick="focusPathInput()">
+          <span class="em-action-icon">📄</span>
+          <span class="em-action-title">Paste a path</span>
+          <span class="em-action-sub">Owners, contributors, recent PRs, Jira context.</span>
+        </button>
+        <button class="em-action" onclick="setMode('pr'); focusPathInput()">
+          <span class="em-action-icon">🔀</span>
+          <span class="em-action-title">Review a PR</span>
+          <span class="em-action-sub">DOK-ranked reviewers, risk flags, conflicts.</span>
+        </button>
+        <button class="em-action" onclick="location.href='/contributors'">
+          <span class="em-action-icon">👥</span>
+          <span class="em-action-title">Browse contributors</span>
+          <span class="em-action-sub">Who knows what, grouped by team.</span>
+        </button>
+      </div>
+
+      <div class="em-tries">Try one of these</div>
+      <div class="em-chips">
+        <button class="em-chip" onclick="goto('external/plaid/accounts.go','')">external/plaid/accounts.go</button>
+        <button class="em-chip" onclick="goto('rest/api/binder/binder.go','')">rest/api/binder/binder.go</button>
+        <button class="em-chip" onclick="goto('service/oms/oms.go','')">service/oms/oms.go</button>
+        <button class="em-chip" onclick="goto('gberrors/customer_reason.go','')">gberrors/customer_reason.go</button>
+      </div>
+
+      <div class="em-foot">
+        Reads <code>CODEOWNERS</code>, <code>git</code>, <code>gh</code>, <code>acli</code>
+        <span class="em-dot">•</span> LLM runs locally via Ollama
+        <span class="em-dot">•</span> Nothing leaves this machine
+      </div>
     </div></div>
   </div>
 </main>
@@ -544,8 +599,12 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 <div id="toast" class="toast"></div>
 
 <script>
-const PREFILL_PATH = "external/plaid/accounts.go";
-const PREFILL_RANGE = "";  // whole file by default — line ranges are noise for ownership Qs
+// Landing state: no auto-investigation. The empty-state card has quick-try chips
+// that call goto() for users who want a demo path. Deep-linked URLs still auto-run.
+function focusPathInput() {
+  const el = document.getElementById("path-input");
+  if (el) { el.focus(); el.select && el.select(); }
+}
 
 const state = {
   paths: [],          // all gobroker paths for autocomplete
@@ -717,22 +776,25 @@ const toast = msg => { const t=$("toast"); t.textContent=msg; t.classList.add("o
 async function init() {
   const url = new URL(location.href);
   const prParam = url.searchParams.get("pr");
-  const p = url.searchParams.get("path") || (prParam ? "" : PREFILL_PATH);
-  const r = url.searchParams.get("range") || PREFILL_RANGE;
+  const pathParam = url.searchParams.get("path");
 
   loadPaths();
   loadHealth();
   renderRecent();
   await loadCacheFromIdb();
 
+  // Only auto-investigate when the URL carries a deep link. Fresh visits land
+  // on the empty-state card so users decide what to explore first.
   if (prParam) {
     setMode("pr");
     $("path-input").value = prParam;
     investigate({ skipPush: true });
-  } else {
-    $("path-input").value = p;
-    $("range-input").value = r;
+  } else if (pathParam) {
+    $("path-input").value = pathParam;
+    $("range-input").value = url.searchParams.get("range") || "";
     investigate({ skipPush: true });
+  } else {
+    focusPathInput();
   }
 }
 
