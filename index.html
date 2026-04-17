@@ -8,13 +8,19 @@
 <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
 <style>
 :root{
-  --bg:#f7f8fa; --surface:#fff; --border:#e5e7eb; --border-strong:#d1d5db;
-  --text:#111827; --dim:#6b7280; --faint:#9ca3af;
+  --bg:#faf8f3; --surface:#fff; --border:#ece8de; --border-strong:#d6d0c0;
+  --text:#181c1f; --dim:#6b6b6b; --faint:#9b9588;
   --accent:#6366f1; --accent-bg:#eef2ff;
   --green:#059669; --green-bg:#ecfdf5;
   --amber:#b45309; --amber-bg:#fef3c7;
   --rose:#be123c; --rose-bg:#ffe4e6;
   --code-bg:#0f172a; --code-fg:#e2e8f0;
+  /* Alpaca brand */
+  --alpaca-yellow:#FFD400;
+  --alpaca-yellow-soft:#FFF3B0;
+  --alpaca-gold:#C8941A;
+  --alpaca-gold-bg:#FCEBA9;
+  --alpaca-cream:#FBF6E8;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden}
@@ -28,18 +34,24 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 
 /* ===== Left rail ===== */
 .rail{border-right:1px solid var(--border);background:var(--surface);
-  display:flex;flex-direction:column;overflow:hidden}
-.rail-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.logo{width:26px;height:26px;border-radius:6px;display:block;object-fit:cover;
-  box-shadow:0 1px 2px rgba(0,0,0,.08);background:#fff}
+  display:flex;flex-direction:column;overflow:hidden;position:relative}
+.rail::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--alpaca-yellow) 0%,var(--alpaca-gold) 60%,var(--alpaca-yellow) 100%);
+  z-index:1}
+.rail-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;
+  background:linear-gradient(180deg,var(--alpaca-cream) 0%,var(--surface) 100%)}
+.logo{width:28px;height:28px;border-radius:7px;display:block;object-fit:cover;
+  background:#fff;box-shadow:0 0 0 1.5px var(--alpaca-yellow),0 1px 3px rgba(184,132,26,.18)}
 .brand-name{font-weight:700;letter-spacing:-.01em;font-size:14px}
-.tag{margin-left:auto;font-size:10px;font-weight:600;color:var(--faint);
-  border:1px solid var(--border);border-radius:5px;padding:2px 7px}
+.tag{margin-left:auto;font-size:10px;font-weight:700;color:var(--alpaca-gold);
+  background:var(--alpaca-yellow-soft);border:1px solid var(--alpaca-gold-bg);
+  border-radius:5px;padding:2px 7px;letter-spacing:.02em}
 .rail-nav{display:flex;gap:0;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg)}
 .rail-nav a{flex:1;text-align:center;font-size:11px;font-weight:600;color:var(--dim);
   padding:6px 8px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em;transition:.1s}
 .rail-nav a:hover{color:var(--text);background:var(--surface);text-decoration:none}
-.rail-nav a.active{color:var(--text);background:var(--surface);border:1px solid var(--border)}
+.rail-nav a.active{color:var(--text);background:var(--alpaca-yellow-soft);
+  border:1px solid var(--alpaca-gold-bg);box-shadow:0 1px 0 rgba(184,132,26,.08)}
 
 .mode-toggle{display:flex;gap:0;padding:10px 16px 0;}
 .mode-toggle button{flex:1;height:26px;border:1px solid var(--border);background:var(--bg);
@@ -57,10 +69,13 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .search input.path-input{padding-right:60px;font-family:"SF Mono","Fira Code",ui-monospace,monospace;font-size:12px}
 .search-row{display:flex;gap:6px;margin-top:8px}
 .search-row input.range-input{width:80px;text-align:center;font-family:"SF Mono",ui-monospace,monospace;font-size:12px}
-.search-row button{flex:1;height:34px;border:none;border-radius:7px;background:var(--text);color:#fff;
-  font-size:13px;font-weight:600;cursor:pointer;transition:opacity .12s}
-.search-row button:hover{opacity:.85}
-.search-row button:disabled{opacity:.5;cursor:wait}
+.search-row button{flex:1;height:34px;border:none;border-radius:7px;
+  background:linear-gradient(180deg,var(--alpaca-yellow) 0%,#F5C800 100%);color:var(--text);
+  font-size:13px;font-weight:700;letter-spacing:.01em;cursor:pointer;transition:transform .08s,box-shadow .12s;
+  box-shadow:0 1px 0 rgba(0,0,0,.04),0 1px 3px rgba(184,132,26,.25)}
+.search-row button:hover{box-shadow:0 1px 0 rgba(0,0,0,.05),0 2px 6px rgba(184,132,26,.35);transform:translateY(-1px)}
+.search-row button:active{transform:translateY(0)}
+.search-row button:disabled{opacity:.55;cursor:wait;transform:none;box-shadow:none}
 
 .sugg{position:absolute;top:54px;left:16px;right:16px;background:var(--surface);
   border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.08);
