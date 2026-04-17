@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from . import contributors as contributors_mod
 from . import git_ops, paths_index, pr as pr_mod, prewarm, recent, synth, vectors
 from .config import GOBROKER_PATH, GH_REPO, OLLAMA_HOST, OLLAMA_MODEL, OLLAMA_EMBED_MODEL
 
@@ -120,6 +121,28 @@ def pr_investigate(ident: str):
     if case.get("error"):
         raise HTTPException(400, case["error"])
     return JSONResponse(case)
+
+
+@app.get("/api/contributors")
+def api_contributors():
+    """Org roster + gobroker commit counts + team memberships. Serves the
+    /contributors list page. Data is pulled from on-disk caches (shortlog
+    refreshed daily, roster weekly) so this responds in <100ms once warm."""
+    return JSONResponse(contributors_mod.list_all())
+
+
+@app.get("/api/contributors/{login}")
+def api_contributor_detail(login: str):
+    """Per-contributor profile: top files, recent commits, team membership."""
+    data = contributors_mod.detail(login)
+    if data.get("error"):
+        raise HTTPException(400, data["error"])
+    return JSONResponse(data)
+
+
+@app.get("/contributors")
+def contributors_page():
+    return FileResponse(ROOT / "contributors.html")
 
 
 @app.get("/")
