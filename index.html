@@ -541,11 +541,6 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
     <div id="recent" class="rail-list"></div>
   </div>
 
-  <div class="rail-section" id="similar-section" style="display:none">
-    <h4>Similar files</h4>
-    <div id="similar" class="rail-list"></div>
-  </div>
-
   <div class="rail-foot">
     <span id="status">…</span>
     <a href="#" onclick="reindex();return false" id="reindex-link">reindex</a>
@@ -1479,7 +1474,6 @@ function withDefaults(c) {
   return {
     path: c.path || "",
     range: c.range || "",
-    similar: c.similar || [],
     contributors: c.contributors || [],
     timeline: c.timeline || [],
     openPr: c.openPr || null,
@@ -1549,16 +1543,6 @@ function stopElapsedTicker() {
 // ---------- Granular section builders ----------
 // Each returns the inner HTML for the card with the matching id in renderShell().
 // Update functions call setHTML(id, builder(c)) so only the affected card paints.
-
-function similarRailHtml(c) {
-  const sim = c.similar || [];
-  if (!sim.length) return "";
-  return sim.map(s => `
-    <div class="rail-item" onclick="goto(${esc(JSON.stringify(s.path))}, '')">
-      <div class="ri-path" title="${esc(s.path)}">${esc(s.path)}</div>
-      <div class="ri-meta"><span class="ri-team">${esc((s.team||"").replace("@alpacahq/",""))}</span><span class="ri-score">${(s.score*100).toFixed(0)}%</span></div>
-    </div>`).join("");
-}
 
 function headerActionsHtml(c, stages) {
   const ghPath = `https://github.com/alpacahq/gobroker/blob/master/${c.path}${c.range?'#L'+c.range.split('-')[0]:''}`;
@@ -1869,15 +1853,6 @@ function setHTML(id, html) {
 function render(c, justArrived) {
   const stages = c._stages || {};
   const key = `${c.path}|${c.range||""}`;
-
-  // Left rail — cheap, always update; setHTML no-ops when unchanged.
-  const sim = similarRailHtml(c);
-  if (sim) {
-    $("similar-section").style.display = "block";
-    setHTML("similar", sim);
-  } else {
-    $("similar-section").style.display = "none";
-  }
 
   // First time we render this path/range pair — paint the whole shell.
   if (state._renderKey !== key || !document.getElementById("sec-pills")) {
