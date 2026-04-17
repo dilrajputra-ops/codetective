@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 import threading
 
-from . import gh_client, gh_roster, llm, recent
+from . import contributors, gh_client, gh_roster, gh_teams, llm, recent
 from .config import MERGED_WINDOWS_DAYS, PREWARM_TOP_N
 
 
@@ -58,8 +58,31 @@ def _warm_roster() -> None:
         print(f"[prewarm] gh roster error: {e!r}", file=sys.stderr)
 
 
+def _warm_teams() -> None:
+    """Bulk-fetch every alpacahq team + members so the contributors page
+    can tag every engineer with their team(s) on first load. ~3s cold,
+    cached 24h. Safe to run repeatedly — preserves existing cache on failure."""
+    try:
+        n = gh_teams.refresh_all()
+        print(f"[prewarm] gh teams refreshed: {n} teams", file=sys.stderr)
+    except Exception as e:
+        print(f"[prewarm] gh teams error: {e!r}", file=sys.stderr)
+
+
+def _warm_shortlog() -> None:
+    """Trigger the git shortlog scan so the /contributors list view returns
+    instantly on first hit. ~2s cold, cached 24h."""
+    try:
+        rows = contributors._load_shortlog()  # type: ignore[attr-defined]
+        print(f"[prewarm] git shortlog ready: {len(rows)} authors", file=sys.stderr)
+    except Exception as e:
+        print(f"[prewarm] git shortlog error: {e!r}", file=sys.stderr)
+
+
 def kick_off() -> None:
     """Fire-and-forget prewarm in a daemon thread."""
     threading.Thread(target=_warm_loop, name="prewarm-gh", daemon=True).start()
     threading.Thread(target=_warm_llm, name="prewarm-llm", daemon=True).start()
     threading.Thread(target=_warm_roster, name="prewarm-roster", daemon=True).start()
+    threading.Thread(target=_warm_teams, name="prewarm-teams", daemon=True).start()
+    threading.Thread(target=_warm_shortlog, name="prewarm-shortlog", daemon=True).start()

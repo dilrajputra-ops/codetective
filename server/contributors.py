@@ -30,6 +30,10 @@ DETAIL_TTL = 6 * 60 * 60
 
 _SHORTLOG_RE = re.compile(r"^\s*(\d+)\s+(.+?)\s+<(.+?)>\s*$")
 
+# Catch-all GitHub teams that include nearly everyone — filtered from
+# per-person pills so cards aren't dominated by noise. They stay in the cache.
+_NOISY_TEAM_SLUGS = {"engineering", "read-only-members", "members"}
+
 
 # ---------- git shortlog: per-author commit counts across the whole repo ----------
 
@@ -59,7 +63,35 @@ def _run_shortlog() -> list[dict]:
         return []
 
 
+def _last_commit_per_email() -> dict[str, str]:
+    """Most recent author date per email across all of HEAD.
+
+    Single shellout, ~2s on gobroker. `git log` outputs commits in reverse
+    chronological order, so the first occurrence per email is the most
+    recent author timestamp. Returned as ISO strings."""
+    try:
+        out = subprocess.run(
+            ["git", "log", "HEAD", "--format=%ae%x09%aI", "--no-merges"],
+            cwd=str(GOBROKER_PATH),
+            capture_output=True, text=True, timeout=30,
+        )
+        if out.returncode != 0:
+            return {}
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {}
+    seen: dict[str, str] = {}
+    for line in out.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        email, date = line.split("\t", 1)
+        email = email.strip().lower()
+        if email and email not in seen:
+            seen[email] = date.strip()
+    return seen
+
+
 def _load_shortlog() -> list[dict]:
+    """Returns shortlog rows enriched with `last_commit` ISO date per email."""
     if SHORTLOG_CACHE.exists():
         try:
             data = json.loads(SHORTLOG_CACHE.read_text())
@@ -68,6 +100,9 @@ def _load_shortlog() -> list[dict]:
         except (OSError, json.JSONDecodeError):
             pass
     rows = _run_shortlog()
+    last_dates = _last_commit_per_email()
+    for r in rows:
+        r["last_commit"] = last_dates.get(r["email"], "")
     try:
         SHORTLOG_CACHE.parent.mkdir(parents=True, exist_ok=True)
         SHORTLOG_CACHE.write_text(json.dumps({"_fetched_at": int(time.time()), "rows": rows}))
@@ -124,6 +159,7 @@ def list_all() -> dict:
     unmatched: list[dict] = []
     for row in shortlog:
         login = _email_to_login(row["name"], row["email"])
+        last = row.get("last_commit") or ""
         if not login:
             # Still surface them so the page is honest about unresolved authors.
             unmatched.append({
@@ -131,6 +167,7 @@ def list_all() -> dict:
                 "name": row["name"],
                 "email": row["email"],
                 "commits": row["commits"],
+                "last_active": last,
                 "resolved": False,
             })
             continue
@@ -141,12 +178,16 @@ def list_all() -> dict:
                 "name": login_to_name.get(login) or row["name"],
                 "commits": 0,
                 "emails": [],
+                "last_active": "",
                 "resolved": True,
             }
             by_login[login] = entry
         entry["commits"] += row["commits"]
         if row["email"] not in entry["emails"]:
             entry["emails"].append(row["email"])
+        # Keep the most recent of all the engineer's git identities.
+        if last and (not entry["last_active"] or last > entry["last_active"]):
+            entry["last_active"] = last
 
     # Include roster members who haven't committed (new hires, non-engineers).
     for m in roster_members:
@@ -157,32 +198,61 @@ def list_all() -> dict:
                 "name": m.get("name") or "",
                 "commits": 0,
                 "emails": [],
+                "last_active": "",
                 "resolved": True,
             }
 
-    # Enrich with team memberships. We look up the cached gh_teams file rather
-    # than making fresh API calls — the prewarm thread populates it over time
-    # as teams are referenced by investigations. Missing teams just show blank.
+    # Enrich with team memberships from the bulk team cache. `gh_teams.refresh_all`
+    # populates this on startup so every engineer can be tagged with their team(s),
+    # not just teams referenced by recent investigations. Catch-all teams (e.g.
+    # `engineering`, which contains all 149 engineers) are filtered out so the
+    # per-card pills carry actual signal.
     team_cache = gh_teams._load_cache()  # type: ignore[attr-defined]
-    login_teams: dict[str, list[str]] = {}
+    login_teams: dict[str, list[dict]] = {}
+    teams_summary: list[dict] = []
     for slug, entry in (team_cache or {}).items():
         team_name = entry.get("name") or slug
-        for member in entry.get("members") or []:
+        members = entry.get("members") or []
+        teams_summary.append({
+            "slug": slug,
+            "name": team_name,
+            "members_count": entry.get("members_count") or len(members),
+            "noisy": slug in _NOISY_TEAM_SLUGS,
+        })
+        if slug in _NOISY_TEAM_SLUGS:
+            continue
+        for member in members:
             login = member.get("login")
             if not login:
                 continue
-            login_teams.setdefault(login, []).append(team_name)
+            login_teams.setdefault(login, []).append({"slug": slug, "name": team_name})
 
     for entry in by_login.values():
-        entry["teams"] = sorted(login_teams.get(entry["login"], []))
+        entry_teams = login_teams.get(entry["login"], [])
+        entry["teams"] = sorted({t["name"] for t in entry_teams})
+        entry["team_slugs"] = sorted({t["slug"] for t in entry_teams})
 
     resolved = sorted(by_login.values(), key=lambda e: (-e["commits"], e["login"].lower()))
     unmatched.sort(key=lambda e: -e["commits"])
+
+    # Order team chips by how many resolved committers belong to each team —
+    # most-relevant team first so the chip bar is immediately useful.
+    team_committer_count: Counter = Counter()
+    for entry in resolved:
+        if entry["commits"] <= 0:
+            continue
+        for t in entry["team_slugs"]:
+            team_committer_count[t] += 1
+    teams_summary = [t for t in teams_summary if not t["noisy"]]
+    teams_summary.sort(key=lambda t: (-team_committer_count.get(t["slug"], 0), t["name"]))
+    for t in teams_summary:
+        t["committer_count"] = team_committer_count.get(t["slug"], 0)
 
     return {
         "total": len(resolved) + len(unmatched),
         "resolved_count": sum(1 for e in resolved if e["commits"] > 0),
         "unresolved_count": len(unmatched),
+        "teams": teams_summary,
         "contributors": resolved,
         "unmatched": unmatched[:20],  # cap — not actionable beyond the top few
     }
