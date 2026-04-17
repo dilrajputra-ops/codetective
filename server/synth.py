@@ -33,6 +33,7 @@ from . import (
     expertise,
     gh_client,
     git_ops,
+    jira_client,
     jira_extract,
     llm,
     owners_map,
@@ -515,6 +516,11 @@ def investigate_stream(path: str, range_str: Optional[str]):
     except Exception:
         pass
 
+    # Fetch Jira ticket bodies for the top extracted IDs. Descriptions are where
+    # business intent actually lives ("why are we building this for partner X,
+    # what regulatory constraint applies"). Parallel, cached 24h.
+    jira_tickets = jira_client.fetch_many([j["id"] for j in jira_ids[:3]])
+
     llm_signals = {
         "path": path,
         "range": range_str or "",
@@ -538,6 +544,16 @@ def investigate_stream(path: str, range_str: Optional[str]):
         "merged_prs_30d_count": merged_30["count"],
         "merged_prs_90d_count": merged_90["count"],
         "jira": jira_ids[:3],
+        "jira_tickets": [
+            {
+                "id": t["id"],
+                "summary": t.get("summary", ""),
+                "description": (t.get("description") or "")[:800],
+                "issuetype": t.get("issuetype", ""),
+                "status": t.get("status", ""),
+            }
+            for t in jira_tickets if not t.get("error")
+        ],
         "top_contributors": [
             {
                 "name": c["name"],
@@ -562,8 +578,8 @@ def investigate_stream(path: str, range_str: Optional[str]):
     yield {
         "stage": "narrative",
         "summary": {"title": team_short, "copy": narrative["summary_copy"]},
-        "codePurpose": narrative.get("code_purpose", ""),
-        "recentContext": narrative.get("recent_context", ""),
+        "purpose": narrative.get("purpose", ""),
+        "decisions": narrative.get("decisions", []),
         "gotchas": narrative.get("gotchas", []),
         "activitySummary": narrative.get("activity_summary", ""),
         "timelineNotes": narrative.get("timeline_notes", []),

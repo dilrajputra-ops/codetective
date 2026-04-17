@@ -20,50 +20,66 @@ LLM_CACHE_DIR = CACHE_DIR / "llm"
 LLM_CACHE_TTL_SECONDS = 3600
 
 SYSTEM = (
-    "You are Codemap. Given a file path's code head and recent commits, write a "
-    "SHORT engineer-to-engineer briefing on what the file does and what changed lately. "
-    "Return strict JSON only.\n\n"
-    "PRIMARY OUTPUTS — these are what an engineer actually wants:\n"
-    "- code_purpose: What this file does, derived from `file_head` (package decl, doc comments, "
-    "  type/struct names, function signatures). Be CONCRETE about identifiers — name the actual "
-    "  types/functions defined. If file_head is empty or non-code (yaml/json), describe what the "
-    "  config controls based on its keys.\n"
-    "- recent_context: What's been happening lately, derived from commit subjects + bodies. "
-    "  Group themes ('error handling cleanup', 'TWAP/VWAP support', 'feature-flag rollout'); "
-    "  don't just rephrase one commit. Reference Jira IDs from subjects when present.\n"
-    "- gotchas: Up to 3 short bullets surfacing non-obvious behavior or constraints found in "
-    "  code comments (TODO/FIXME/NOTE/HACK/WARNING) or commit bodies (rollback notes, gotchas, "
-    "  follow-ups). Empty array if nothing notable — do NOT pad with generic advice.\n\n"
-    "ANTI-HALLUCINATION (strict):\n"
-    "- NEVER invent type names, function names, PR numbers, SHAs, URLs, or identifiers. "
-    "  Only reference symbols literally present in file_head or signals.\n"
-    "- If file_head is empty, say 'No source preview available' for code_purpose — do NOT guess.\n"
-    "- next_step.url MUST be copied verbatim from open_prs[].url, latest_commit url, "
-    "  merged_prs_30d[].url, or jira[].url. Never assemble URLs.\n"
-    "- If open_prs is empty, pick a different next_step — do NOT invent a PR.\n\n"
-    "SECONDARY OUTPUTS (terse, optional):\n"
-    "- summary_copy: 1 sentence: '<team_short> owns this. <one-clause about activity>.'\n"
-    "- activity_summary: 1 sentence (<=22 words) on cadence — open vs merged counts.\n"
-    "- timeline_notes: one plain-English sentence per commit in commits[], same order, "
-    "  describing engineering intent (skip author names).\n"
-    "- why: up to 3 bullets if there's something genuinely useful to say about routing; "
-    "  otherwise leave the array empty.\n"
-    "- next_step: only if there's an obvious one (open PR to review, etc.); skip otherwise.\n\n"
+    "You are Codemap. You read a file's code, its recent commits, and the Jira "
+    "tickets those commits reference. Speak as if the file is explaining its own "
+    "existence to a new engineer — what business problem it solves, what trade-offs "
+    "have been made, and what's in motion right now. Return strict JSON only.\n\n"
+    "PRIMARY OUTPUTS:\n"
+    "- purpose: ONE sentence on the business reason this file exists. Lead with "
+    "  the problem being solved, not 'This file contains X'. Ground in file_head "
+    "  identifiers + jira_tickets[].description + commit bodies. If there's no "
+    "  business signal at all (no Jira tickets, terse commits, empty comments), "
+    "  return an empty string — do NOT pad.\n"
+    "- decisions: Array of {claim, evidence} objects (0-4 items). Each claim is "
+    "  ONE short sentence describing a business or design decision visible in the "
+    "  evidence. Evidence is a short verbatim quote (<=120 chars) from a Jira "
+    "  ticket, commit subject/body, or code comment — plus its source label "
+    "  like 'LPCD-1719', 'commit abc1234', or 'comment'. If there's nothing worth "
+    "  saying, return [] — do NOT fabricate decisions to fill space.\n"
+    "- gotchas: Up to 3 short bullets on non-obvious behavior or constraints "
+    "  (found in TODO/FIXME/NOTE/HACK/WARNING comments, rollback notes, or Jira "
+    "  caveats). Empty array if nothing is notable.\n\n"
+    "FORBIDDEN PHRASES (rewrite if you find yourself typing these):\n"
+    "- 'This file contains...'  -> just state the purpose directly.\n"
+    "- 'Recent changes include...'  -> name the decision, cite the evidence.\n"
+    "- 'It includes tests for...'  -> say what invariant the tests protect and why.\n"
+    "- 'various improvements', 'general updates', 'enhancements to...' (filler).\n"
+    "- ANY paragraph that reads like a Wikipedia summary. This is engineer-to-"
+    "  engineer, not executive-to-board.\n\n"
+    "EVIDENCE RULES (strict):\n"
+    "- Every claim in decisions[] must cite evidence that exists VERBATIM in the "
+    "  input signals (jira_tickets, commits, file_head). Do not paraphrase into "
+    "  the evidence field — quote.\n"
+    "- Prefer jira_tickets[].description as evidence when available — that's "
+    "  where the business 'why' lives. Fall back to commit bodies, then subjects.\n"
+    "- Never invent Jira IDs, PR numbers, SHAs, function names, or URLs. If "
+    "  unsure, omit.\n\n"
+    "SECONDARY OUTPUTS (terse, for other UI sections):\n"
+    "- summary_copy: 1 sentence, format '<team_short> owns this. <1 clause on activity>.'\n"
+    "- activity_summary: 1 sentence on cadence (<=22 words).\n"
+    "- timeline_notes: one plain-English sentence per commit in commits[], same order.\n"
+    "- why: 0-3 bullets about routing. Empty array if nothing specific.\n"
+    "- next_step: optional; only if there's an obvious action grounded in signals.\n\n"
     "OWNERSHIP:\n"
     "- If ownership_inferred is true, mention 'inferred from parent dir' once.\n"
-    "- If ownership_inferred is false, do NOT mention inference — CODEOWNERS is direct."
+    "- If ownership_inferred is false, do NOT mention inference."
 )
 
 SCHEMA_HINT = {
-    "code_purpose": "2-3 sentences on what this file does and why it exists, grounded in file_head identifiers and doc comments.",
-    "recent_context": "1-2 sentences on themes across recent commits — what changed, why, any in-flight work.",
-    "gotchas": ["Up to 3 short bullets on non-obvious behavior found in comments or commit bodies. Empty if none."],
+    "purpose": "ONE sentence on the business reason this file exists, or empty string if no business signal.",
+    "decisions": [
+        {
+            "claim": "One short sentence naming a business or design decision.",
+            "evidence": "Short verbatim quote from a Jira ticket / commit / comment, plus its source label e.g. 'LPCD-1719'.",
+        }
+    ],
+    "gotchas": ["Up to 3 short bullets. Empty if nothing notable."],
     "summary_copy": "1 sentence on owner + headline activity.",
     "activity_summary": "1 sentence on merge/open cadence.",
     "timeline_notes": ["One sentence per commit in commits[], same order."],
-    "why": ["Optional: bullets about why this team owns the area. Empty array is fine."],
+    "why": ["Optional bullets; [] is fine."],
     "next_step": {
-        "title": "short imperative — 'Read latest commit', 'Review open PR', 'Ping #eng-payments'. No placeholder numbers.",
+        "title": "short imperative",
         "copy": "1 sentence on why, grounded in a signal.",
         "link_label": "short label",
         "url": "URL copied verbatim from signals; empty string if none fits.",
@@ -155,8 +171,8 @@ def _fallback(signals: dict) -> dict:
     # leave these empty rather than fake it with raw signal dumps — the UI shows an
     # explicit "no local LLM" empty state instead.
     return {
-        "code_purpose": "",
-        "recent_context": "",
+        "purpose": "",
+        "decisions": [],
         "gotchas": [],
         "summary_copy": summary,
         "activity_summary": activity_summary,
@@ -246,10 +262,18 @@ def synthesize(signals: dict) -> dict:
         return out
 
     out = _fallback(signals)
-    if isinstance(data.get("code_purpose"), str) and data["code_purpose"].strip():
-        out["code_purpose"] = data["code_purpose"].strip()
-    if isinstance(data.get("recent_context"), str) and data["recent_context"].strip():
-        out["recent_context"] = data["recent_context"].strip()
+    if isinstance(data.get("purpose"), str) and data["purpose"].strip():
+        out["purpose"] = data["purpose"].strip()
+    if isinstance(data.get("decisions"), list):
+        clean_decisions: list[dict] = []
+        for item in data["decisions"]:
+            if not isinstance(item, dict):
+                continue
+            claim = str(item.get("claim") or "").strip()
+            evidence = str(item.get("evidence") or "").strip()
+            if claim and evidence:
+                clean_decisions.append({"claim": claim[:280], "evidence": evidence[:280]})
+        out["decisions"] = clean_decisions[:4]
     if isinstance(data.get("gotchas"), list):
         gotchas = [str(x).strip() for x in data["gotchas"] if str(x).strip()][:3]
         out["gotchas"] = gotchas
