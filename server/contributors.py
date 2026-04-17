@@ -228,14 +228,18 @@ def _emails_for_login(login: str) -> list[str]:
 
 def _git_log_author(author_pattern: str, limit: int = 50) -> list[dict]:
     """`git log --author=<regex> --name-only` → list of commits with files.
-    Uses `-i --author` with a regex that matches any of the engineer's emails."""
+
+    Important: git's --author uses BRE by default, where `|` is a literal
+    character. We pass --extended-regexp so alternation across multiple
+    emails (`a@b|c@d`) works. Without this, multi-email engineers silently
+    return zero commits."""
     fmt = "%H%x09%ad%x09%an%x09%ae%x09%s"
     try:
         out = subprocess.run(
             ["git", "log",
+             "--extended-regexp",
              f"--author={author_pattern}",
              "--all",
-             "-i",
              "--regexp-ignore-case",
              f"-n{limit}",
              "--name-only",
