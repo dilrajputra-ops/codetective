@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import git_ops, paths_index, prewarm, recent, synth, vectors
+from . import git_ops, paths_index, pr as pr_mod, prewarm, recent, synth, vectors
 from .config import GOBROKER_PATH, GH_REPO
 
 app = FastAPI(title="Codemap")
@@ -106,6 +106,15 @@ def investigate_stream(path: str, range: str | None = None, fp: str | None = Non
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/pr/{ident:path}")
+def pr_investigate(ident: str):
+    """PR-mode investigation. `ident` may be a PR number, GitHub PR URL, or Jira key."""
+    case = pr_mod.investigate(ident)
+    if case.get("error"):
+        raise HTTPException(400, case["error"])
+    return JSONResponse(case)
 
 
 @app.get("/")

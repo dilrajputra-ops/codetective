@@ -33,7 +33,16 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .tag{margin-left:auto;font-size:10px;font-weight:600;color:var(--faint);
   border:1px solid var(--border);border-radius:5px;padding:2px 7px}
 
-.search{padding:14px 16px;border-bottom:1px solid var(--border);position:relative}
+.mode-toggle{display:flex;gap:0;padding:10px 16px 0;}
+.mode-toggle button{flex:1;height:26px;border:1px solid var(--border);background:var(--bg);
+  font-size:11px;font-weight:600;color:var(--faint);cursor:pointer;transition:.12s;
+  text-transform:uppercase;letter-spacing:.04em}
+.mode-toggle button:first-child{border-radius:6px 0 0 6px;border-right:none}
+.mode-toggle button:last-child{border-radius:0 6px 6px 0}
+.mode-toggle button.on{background:var(--text);color:#fff;border-color:var(--text)}
+.mode-toggle button:hover:not(.on){color:var(--text)}
+.search{padding:10px 16px 14px;border-bottom:1px solid var(--border);position:relative}
+.search.pr-mode .range-input,.search.pr-mode #sugg{display:none}
 .search input{width:100%;height:34px;border:1px solid var(--border);border-radius:7px;
   padding:0 10px;background:var(--bg);font-size:13px;outline:none;transition:border-color .12s}
 .search input:focus{border-color:var(--accent);background:var(--surface)}
@@ -128,6 +137,8 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .tab-body{display:none}
 .tab-body.on{display:block;animation:fadeIn .15s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes flashIn{from{opacity:0}to{opacity:1}}
+.flash-in{animation:flashIn .18s ease}
 
 /* Cards */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
@@ -322,7 +333,11 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
     <span class="tag">gobroker</span>
   </div>
 
-  <div class="search">
+  <div class="mode-toggle" id="mode-toggle">
+    <button id="mode-path" class="on" onclick="setMode('path')">Path</button>
+    <button id="mode-pr" onclick="setMode('pr')">PR</button>
+  </div>
+  <div class="search" id="search-box">
     <input id="path-input" class="path-input" autocomplete="off" spellcheck="false"
            placeholder="Type a path…">
     <div id="sugg" class="sugg"></div>
@@ -528,23 +543,25 @@ const toast = msg => { const t=$("toast"); t.textContent=msg; t.classList.add("o
 
 // ---- bootstrap ----
 async function init() {
-  // Read URL or prefill
   const url = new URL(location.href);
-  const p = url.searchParams.get("path") || PREFILL_PATH;
+  const prParam = url.searchParams.get("pr");
+  const p = url.searchParams.get("path") || (prParam ? "" : PREFILL_PATH);
   const r = url.searchParams.get("range") || PREFILL_RANGE;
-  $("path-input").value = p;
-  $("range-input").value = r;
 
-  // Background load: paths for autocomplete + health for status
   loadPaths();
   loadHealth();
   renderRecent();
-
-  // Hydrate the result cache from IndexedDB so the first investigate can
-  // render an instant stale snapshot + send fp= to short-circuit if unchanged.
   await loadCacheFromIdb();
 
-  investigate({ skipPush: true });
+  if (prParam) {
+    setMode("pr");
+    $("path-input").value = prParam;
+    investigate({ skipPush: true });
+  } else {
+    $("path-input").value = p;
+    $("range-input").value = r;
+    investigate({ skipPush: true });
+  }
 }
 
 async function loadPaths() {
@@ -683,9 +700,21 @@ function goto(path, range) {
 
 window.addEventListener("popstate", e => {
   const url = new URL(location.href);
+  const prParam = url.searchParams.get("pr");
+  if (prParam) {
+    setMode("pr");
+    $("path-input").value = prParam;
+    investigate({ skipPush: true });
+    return;
+  }
   const p = url.searchParams.get("path");
   const r = url.searchParams.get("range") || "";
-  if (p) { $("path-input").value = p; $("range-input").value = r; investigate({ skipPush: true }); }
+  if (p) {
+    setMode("path");
+    $("path-input").value = p;
+    $("range-input").value = r;
+    investigate({ skipPush: true });
+  }
 });
 
 function copyLink() {
@@ -776,8 +805,24 @@ function streamInvestigate(path, range, fp, onPartial) {
   });
 }
 
+// Mode toggle: "path" investigates a file, "pr" investigates a PR (number/url/jira).
+state.mode = state.mode || "path";
+function setMode(m) {
+  state.mode = m;
+  $("mode-path").classList.toggle("on", m === "path");
+  $("mode-pr").classList.toggle("on", m === "pr");
+  const sb = $("search-box");
+  sb.classList.toggle("pr-mode", m === "pr");
+  const inp = $("path-input");
+  inp.placeholder = m === "pr" ? "PR # / URL / Jira key (e.g. LPCD-1560)" : "Type a path…";
+  inp.value = "";
+  $("range-input").value = "";
+  $("sugg").style.display = "none";
+}
+
 async function investigate({ skipPush=false } = {}) {
   if (state.busy) return;
+  if (state.mode === "pr") return investigatePR({ skipPush });
   const path = $("path-input").value.trim();
   const range = $("range-input").value.trim();
   if (!path) { toast("Enter a path"); return; }
@@ -788,20 +833,21 @@ async function investigate({ skipPush=false } = {}) {
   startElapsedTicker();
 
   // Stage A: render *something* immediately.
-  // Priority: cached result for this path > previous result (dimmed) > skeleton.
+  // Priority: cached result for this path > shell-only render with loading rows.
+  // We deliberately don't dim the previous pane or wipe to a skeleton — both
+  // were "the whole right side is reloading." Per-card loading rows + the top
+  // progress bar are enough to communicate "fresh data is on the way."
   const cached = cacheGet(path, range);
-  let working;  // running case dict we'll merge stages into
+  let working;
   if (cached) {
     working = JSON.parse(JSON.stringify(cached));
     state.current = working;
     render(withDefaults(working));
-    $("pane-body").classList.add("is-stale");
-  } else if (state.current) {
-    working = {};
-    $("pane-body").classList.add("is-stale");
   } else {
-    working = {};
-    $("pane-body").innerHTML = renderSkeleton();
+    working = { path, range, _stages: {} };
+    state.current = working;
+    state._renderKey = null;
+    render(withDefaults(working));
   }
 
   // Stage B: stream the live result, re-rendering after each event.
@@ -829,7 +875,7 @@ async function investigate({ skipPush=false } = {}) {
       mergePartial(working, partial);
       working._stages = working._stages || {};
       working._stages[partial.stage] = true;
-      render(withDefaults(working));
+      render(withDefaults(working), partial.stage);
     });
     cachePut(path, range, working);  // also refreshes _cachedAt for fp short-circuit
     pushRecent(path, range, working.summary?.title);
@@ -864,9 +910,233 @@ async function investigate({ skipPush=false } = {}) {
     state.busy = false;
     $("go").disabled = false;
     $("top-progress").classList.remove("on");
-    $("pane-body").classList.remove("is-stale");
     stopElapsedTicker();
   }
+}
+
+// ---------- PR mode ----------
+async function investigatePR({ skipPush = false } = {}) {
+  const ident = $("path-input").value.trim();
+  if (!ident) { toast("Enter a PR number, URL, or Jira key"); return; }
+  state.busy = true;
+  $("go").disabled = true;
+  $("top-progress").classList.add("on");
+  startElapsedTicker();
+  $("pane-body").innerHTML = `<div class="card"><h3>Analyzing PR ${esc(ident)}…</h3>${loadingRow("Fetching PR + scoring reviewers across changed files…")}</div>`;
+  try {
+    const r = await fetch(`/pr/${encodeURIComponent(ident)}`);
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({ detail: r.statusText }));
+      renderError(e.detail || "PR lookup failed", ident);
+      return;
+    }
+    const c = await r.json();
+    state.currentPR = c;
+    state._renderKey = null;  // force shell re-render on next path mode use
+    renderPR(c);
+    if (!skipPush) {
+      const u = new URL(location.href);
+      u.searchParams.set("pr", String(c.pr.number));
+      u.searchParams.delete("path");
+      u.searchParams.delete("range");
+      history.pushState({ pr: c.pr.number }, "", u);
+    }
+  } catch (err) {
+    renderError(String(err), ident);
+  } finally {
+    state.busy = false;
+    $("go").disabled = false;
+    $("top-progress").classList.remove("on");
+    stopElapsedTicker();
+  }
+}
+
+// ---------- PR-mode render ----------
+function _agoShort(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const days = (Date.now() - d.getTime()) / 86400000;
+  if (days < 1) return Math.round(days * 24) + "h ago";
+  if (days < 30) return Math.round(days) + "d ago";
+  return Math.round(days / 30) + "mo ago";
+}
+
+function _riskBadge(level) {
+  const cls = level === "high" ? "rose" : level === "med" ? "amber" : "green";
+  return `<span class="pill ${cls}">${esc(level)} risk</span>`;
+}
+
+function reviewerRow(r) {
+  const dot = r.still_on_team ? `<span class="dot" style="background:#22c55e" title="On the CODEOWNERS team"></span>` : "";
+  const status = r.status === "departed" ? `<span class="contrib-badge left">Left Alpaca</span>` : "";
+  const ghLink = r.github_login ? `<a href="https://github.com/${esc(r.github_login)}" target="_blank">@${esc(r.github_login)}</a>` : "";
+  const fileList = r.files.slice(0, 5).map(f => `<code>${esc(f.path.split('/').pop())}</code>`).join(" ");
+  const more = r.files_count > 5 ? ` +${r.files_count - 5}` : "";
+  return `<div class="contrib-card">
+    <div class="contrib-head">
+      <div class="contrib-meta" style="flex:1">
+        <div class="contrib-name">${dot}${esc(r.name)} ${status} ${ghLink}</div>
+        <div class="contrib-role">expert on ${r.files_count} of changed files · score ${r.total_score} (top ${r.max_score})</div>
+        <div class="contrib-role" style="margin-top:4px;color:var(--faint)">${fileList}${more}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function fileMiniCard(f) {
+  if (f.missing) {
+    return `<div class="work-item" style="opacity:.55"><span class="w-badge">missing</span><div class="w-body"><div class="w-title">${esc(f.path)}</div><div class="w-sub">Not in current gobroker checkout (deleted or renamed)</div></div></div>`;
+  }
+  const top = (f.contributors || [])[0];
+  const inferred = f.team_inferred ? `<span class="pill amber" title="Inferred from ${esc(f.team_inferred_from || 'parent')}">inferred</span>` : "";
+  const conflictPill = (f.open_prs && f.open_prs.length > 0) ? `<span class="pill amber">${f.open_prs.length} other open PR${f.open_prs.length===1?'':'s'}</span>` : "";
+  const pingHint = top ? `<div class="w-sub">top expert: ${esc(top.name)}${top.role==='Departed'?' (departed!)':''}</div>` : "";
+  return `<div class="work-item" onclick="goto(${esc(JSON.stringify(f.path))}, '')" style="cursor:pointer">
+    <div class="w-body" style="flex:1">
+      <div class="w-title">${esc(f.path)} <span style="color:var(--faint)">+${f.additions||0}/-${f.deletions||0}</span></div>
+      <div class="w-sub" style="margin-top:4px">
+        <span class="pill gray">${esc(f.team_short)}</span> ${inferred} ${conflictPill}
+      </div>
+      ${pingHint}
+    </div>
+    <span class="w-arrow">↗</span>
+  </div>`;
+}
+
+function teamRow(t) {
+  const slack = t.routing?.slack?.primary ? `<span class="pill gray">${esc(t.routing.slack.primary)}</span>` : "";
+  const gh = t.routing?.github_url ? `<a href="${esc(t.routing.github_url)}" target="_blank">team ↗</a>` : "";
+  const inferredHint = t.any_inferred ? `<span class="pill amber" title="At least one file used parent-directory inference">contains inferred</span>` : "";
+  return `<div class="work-item">
+    <div class="w-body" style="flex:1">
+      <div class="w-title">${esc(t.team_short)} <span style="color:var(--faint)">${t.files_count} file${t.files_count===1?'':'s'}</span> ${inferredHint}</div>
+      <div class="w-sub" style="margin-top:4px">${slack} ${gh}</div>
+    </div>
+  </div>`;
+}
+
+function conflictRow(c) {
+  return `<div class="work-item" onclick="window.open('${esc(c.url)}', '_blank')" style="cursor:pointer">
+    <span class="w-badge open">PR #${esc(c.number)}</span>
+    <div class="w-body">
+      <div class="w-title">${esc(c.title)}</div>
+      <div class="w-sub">by ${esc(c.author)} — touches ${c.files_count} of the same file${c.files_count===1?'':'s'}</div>
+    </div>
+    <span class="w-arrow">↗</span>
+  </div>`;
+}
+
+function riskFlagRow(f) {
+  const sevColor = f.severity === "high" ? "rose" : f.severity === "med" ? "amber" : "gray";
+  return `<div class="work-item">
+    <span class="pill ${sevColor}">${esc(f.severity)}</span>
+    <div class="w-body"><div class="w-title">${esc(f.copy)}</div></div>
+  </div>`;
+}
+
+function renderPR(c) {
+  const pr = c.pr;
+  const stateBadge = pr.is_draft ? `<span class="pill gray">draft</span>`
+    : pr.state === "OPEN" ? `<span class="pill green">open</span>`
+    : pr.state === "MERGED" ? `<span class="pill indigo">merged</span>`
+    : `<span class="pill gray">${esc(pr.state.toLowerCase())}</span>`;
+
+  const recommended = c.reviewers.recommended;
+  const departedRev = c.reviewers.departed_with_history;
+
+  $("pane-body").innerHTML = `
+    <div class="head-card">
+      <div class="head-row">
+        <div>
+          <div class="head-path">PR #${esc(pr.number)} · ${esc(pr.title)}</div>
+        </div>
+        <div class="head-actions">
+          <button onclick="window.open('${esc(pr.url)}', '_blank')">Open in GitHub</button>
+        </div>
+      </div>
+      <div class="team-line">
+        <div class="team-name">by ${esc(pr.author)}</div>
+        <div class="team-lane">${esc(pr.head_branch)} → ${esc(pr.base_branch)}</div>
+        ${stateBadge}
+        ${_riskBadge(c.risk.level)}
+      </div>
+      <div class="pills">
+        <span class="pill gray">${c.files_count} files</span>
+        <span class="pill green">+${pr.additions}</span>
+        <span class="pill rose">-${pr.deletions}</span>
+        <span class="pill gray">updated ${esc(_agoShort(pr.updated_at))}</span>
+        ${c.teams.length > 1 ? `<span class="pill amber">${c.teams.length} teams</span>` : ""}
+        ${c.conflicts.length ? `<span class="pill amber">${c.conflicts.length} conflict${c.conflicts.length===1?'':'s'}</span>` : ""}
+        ${c.missing_files_count ? `<span class="pill gray">${c.missing_files_count} missing</span>` : ""}
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" data-tab="reviewers" onclick="setPRTab('reviewers')">Reviewers (${recommended.length})</button>
+      <button class="tab" data-tab="files" onclick="setPRTab('files')">Files (${c.files_count})</button>
+      <button class="tab" data-tab="teams" onclick="setPRTab('teams')">Teams (${c.teams.length})</button>
+      <button class="tab" data-tab="conflicts" onclick="setPRTab('conflicts')">Conflicts (${c.conflicts.length})</button>
+      <button class="tab" data-tab="risk" onclick="setPRTab('risk')">Risk (${c.risk.flags.length})</button>
+    </div>
+
+    <div class="tab-body on" data-tab="reviewers">
+      <div class="card">
+        <h3>Recommended reviewers · ranked by DOK score across changed files</h3>
+        ${recommended.length
+          ? recommended.map(reviewerRow).join("")
+          : `<div class="rail-empty">No active engineers found with prior history on these files. This PR may be fresh-territory work.</div>`}
+      </div>
+      ${pr.review_requests.length ? `<div class="card">
+        <h3>Currently assigned</h3>
+        ${pr.review_requests.map(login => `<div class="work-item"><div class="w-body"><div class="w-title">${esc(login)}</div></div></div>`).join("")}
+      </div>` : ""}
+      ${departedRev.length ? `<div class="card">
+        <h3>⚠ Has history but departed</h3>
+        <div class="w-sub" style="margin-bottom:8px">These engineers wrote significant parts of the changed code but are no longer at Alpaca. Useful context only.</div>
+        ${departedRev.map(reviewerRow).join("")}
+      </div>` : ""}
+    </div>
+
+    <div class="tab-body" data-tab="files">
+      <div class="card">
+        <h3>Changed files · click to drill into Codemap</h3>
+        ${c.files.map(fileMiniCard).join("")}
+      </div>
+    </div>
+
+    <div class="tab-body" data-tab="teams">
+      <div class="card">
+        <h3>Team breakdown</h3>
+        ${c.teams.length
+          ? c.teams.map(teamRow).join("")
+          : `<div class="rail-empty">No team ownership data</div>`}
+        ${c.teams.length > 1 ? `<div class="w-sub" style="margin-top:10px;padding:10px;background:var(--bg);border-radius:6px">⚠ Cross-team PR. Consider posting in each team's primary Slack channel.</div>` : ""}
+      </div>
+    </div>
+
+    <div class="tab-body" data-tab="conflicts">
+      <div class="card">
+        <h3>Other open PRs touching the same files</h3>
+        ${c.conflicts.length
+          ? c.conflicts.map(conflictRow).join("")
+          : `<div class="rail-empty">No conflicting PRs in flight.</div>`}
+      </div>
+    </div>
+
+    <div class="tab-body" data-tab="risk">
+      <div class="card">
+        <h3>Risk flags</h3>
+        ${c.risk.flags.length
+          ? c.risk.flags.map(riskFlagRow).join("")
+          : `<div class="rail-empty">No risk flags raised.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+function setPRTab(t) {
+  document.querySelectorAll(".tab").forEach(el => el.classList.toggle("on", el.dataset.tab === t));
+  document.querySelectorAll(".tab-body").forEach(el => el.classList.toggle("on", el.dataset.tab === t));
 }
 
 function renderError(msg, path) {
@@ -945,27 +1215,40 @@ function stopElapsedTicker() {
   if (_elapsedTick) { clearInterval(_elapsedTick); _elapsedTick = null; }
 }
 
-function render(c) {
-  const stages = c._stages || {};
-  // Similar files in left rail
+// ---------- Granular section builders ----------
+// Each returns the inner HTML for the card with the matching id in renderShell().
+// Update functions call setHTML(id, builder(c)) so only the affected card paints.
+
+function similarRailHtml(c) {
   const sim = c.similar || [];
-  if (sim.length) {
-    $("similar-section").style.display = "block";
-    $("similar").innerHTML = sim.map(s => `
-      <div class="rail-item" onclick="goto(${esc(JSON.stringify(s.path))}, '')">
-        <div class="ri-path" title="${esc(s.path)}">${esc(s.path)}</div>
-        <div class="ri-meta"><span class="ri-team">${esc((s.team||"").replace("@alpacahq/",""))}</span><span class="ri-score">${(s.score*100).toFixed(0)}%</span></div>
-      </div>`).join("");
-  } else {
-    $("similar-section").style.display = "none";
-  }
+  if (!sim.length) return "";
+  return sim.map(s => `
+    <div class="rail-item" onclick="goto(${esc(JSON.stringify(s.path))}, '')">
+      <div class="ri-path" title="${esc(s.path)}">${esc(s.path)}</div>
+      <div class="ri-meta"><span class="ri-team">${esc((s.team||"").replace("@alpacahq/",""))}</span><span class="ri-score">${(s.score*100).toFixed(0)}%</span></div>
+    </div>`).join("");
+}
 
-  const open = c.openPr;
-  const latest = c.latestPr;
-  const jira = c.jira;
+function headerActionsHtml(c) {
   const ghPath = `https://github.com/alpacahq/gobroker/blob/master/${c.path}${c.range?'#L'+c.range.split('-')[0]:''}`;
+  return `
+    <div>
+      <div class="head-path">${esc(c.path)}${c.range?` <span style="color:var(--faint)"> · L${esc(c.range)}</span>`:""}</div>
+    </div>
+    <div class="head-actions">
+      <button onclick="copyLink()">Copy link</button>
+      <button onclick="window.open('${ghPath}', '_blank')">Open in GitHub</button>
+    </div>`;
+}
 
-  // Stage-gated header pills: PR/merged counts only after github stage; otherwise show a "fetching" chip.
+function teamLineHtml(c) {
+  return `
+    <div class="team-name">${esc(c.summary.title)}</div>
+    <div class="team-lane">${esc(c.team.lane)}</div>
+    <span class="pill ${confColor(c.team.confidence)}">${esc(c.team.confidence)} confidence</span>`;
+}
+
+function pillsRowHtml(c, stages) {
   const ghPills = stages.github
     ? `<span class="pill ${c.sources.open_prs?'amber':'gray'}">${c.sources.open_prs} open PR${c.sources.open_prs===1?"":"s"}</span>${mergedPills(c.mergedPrs)}${c.sources.gh_degraded?`<span class="pill rose">gh degraded</span>`:""}`
     : `<span class="pill loading-pill"><span class="mini-spin"></span>fetching PRs…</span>`;
@@ -975,150 +1258,236 @@ function render(c) {
   const llmPill = stages.narrative
     ? (c.sources.llm_used?`<span class="pill gray">local llama</span>`:`<span class="pill gray">templated fallback</span>`)
     : `<span class="pill loading-pill"><span class="mini-spin"></span>narrative…</span>`;
+  return `${contribPill}${ghPills}${c.range?`<span class="pill amber" title="Blame is restricted to these lines">lines ${esc(c.range)}</span>`:""}${c.team.inferred?`<span class="pill amber" title="No direct CODEOWNERS rule; inferred from ${esc(c.team.inferred_from||'parent')}">ownership inferred</span>`:""}${c.sources.codeowners?`<span class="pill gray">CODEOWNERS:${esc(c.sources.codeowners.split(":").pop())}</span>`:""}${stages.contributors?`<span class="pill gray">${c.sources.commits_scanned} commits scanned</span>`:""}${llmPill}`;
+}
 
-  $("pane-body").innerHTML = `
+function tabsContribLabel(c, stages) { return `Contributors${stages.contributors?` (${c.contributors.length})`:""}`; }
+function tabsActivityLabel(c, stages) { return `Activity${stages.contributors?` (${c.timeline.length})`:""}`; }
+
+function aiBadgeHtml(c, stages, withTitle = true) {
+  if (stages.narrative) {
+    return c.sources.llm_used
+      ? `<span class="ai-badge"${withTitle?` title="Generated locally by Llama 3.2 via Ollama"`:""}><span class="dot"></span>local llama</span>`
+      : `<span class="ai-badge pending"${withTitle?` title="Ollama unavailable — using deterministic template"`:""}>templated</span>`;
+  }
+  return `<span class="ai-badge pending"><span class="mini-spin" style="width:8px;height:8px;border-width:1.5px;margin:0 4px 0 0"></span>local llama…</span>`;
+}
+
+function narrativeCardHtml(c, stages) {
+  return `<h3>Narrative ${aiBadgeHtml(c, stages)}</h3>${stages.narrative
+    ? `<p class="narrative">${esc(c.summary.copy)}</p>`
+    : loadingRow("Generating narrative summary…")}`;
+}
+
+function topContribCardHtml(c, stages) {
+  return `<h3>Top contributor</h3>${stages.contributors
+    ? (c.contributors[0] ? contribOverview(c.contributors[0]) : `<div class="rail-empty">None</div>`)
+    : loadingRow("Scoring contributors…")}`;
+}
+
+function latestActivityCardHtml(c, stages) {
+  const open = c.openPr, latest = c.latestPr, jira = c.jira;
+  return `<h3>Latest activity</h3>${stages.contributors
+    ? (latest ? workItem(latest, "merged") : `<div class="rail-empty">No commits</div>`)
+    : loadingRow("Reading recent commits…")}${stages.github
+    ? `${open ? workItem(open, "open") : ""}${jira ? workItem(jira, "jira") : ""}`
+    : loadingRow("Looking up open PRs and Jira…")}`;
+}
+
+function nextStepCardHtml(c, stages) {
+  return stages.narrative ? nextStep(c) : loadingRow("Computing next step…");
+}
+
+function contributorsListCardHtml(c, stages) {
+  return `<h3>Contributors in this range</h3>${stages.contributors
+    ? (c.contributors.length ? c.contributors.map((p,i) => contribCard(p,i)).join("") : `<div class="rail-empty">No contributors found</div>`)
+    : loadingRow("Scoring contributors via DOK-lite…")}`;
+}
+
+function activitySummaryCardHtml(c, stages) {
+  return `<h3>What's happening here ${aiBadgeHtml(c, stages, false)}</h3>${stages.narrative
+    ? `<p class="activity-summary">${esc(c.activitySummary || c.summary.copy || "—")}</p>`
+    : `<p class="activity-summary pending">Composing activity summary…</p>`}`;
+}
+
+function openWorkCardHtml(c, stages) {
+  const open = c.openPr, jira = c.jira;
+  return `<h3>Open work ${stages.github ? `(${(open?1:0) + (jira?1:0)})` : ""}</h3>${stages.github
+    ? ([open, jira].filter(Boolean).map(w => workItem(w, w.badge==="Open PR"?"open":"jira")).join("") || `<div class="rail-empty">Nothing open right now</div>`)
+    : loadingRow("Querying GitHub for open PRs…")}`;
+}
+
+function recentCommitsCardHtml(c, stages) {
+  return `<h3>Recent commits (newest first)</h3>${stages.contributors
+    ? `<div class="tl">${c.timeline.map((t, i) => activityRow(t, c.timelineNotes?.[i], stages.narrative)).join("")}</div>`
+    : loadingRow("Reading git log…")}`;
+}
+
+function mergedSectionWrapHtml(c, stages) {
+  return stages.github
+    ? mergedSection(c.mergedPrs)
+    : `<div class="card"><h3>Recently merged</h3>${loadingRow("Querying GitHub for merged PRs…")}</div>`;
+}
+
+function evidenceWrapHtml(c, stages) {
+  if (!stages.github || !c.evidence?.length) return "";
+  return `<div class="card"><h3>All evidence</h3>${c.evidence.map(e => `
+    <div class="work-item" onclick="window.open('${esc(e.url)}', '_blank')">
+      <span class="w-badge ${e.label.includes('jira')?'jira':e.label.includes('open')?'open':'merged'}">${esc(e.label)}</span>
+      <div class="w-body"><div class="w-title">${esc(e.title)}</div><div class="w-sub">${esc(e.copy)}</div></div>
+      <span class="w-arrow">↗</span>
+    </div>`).join("")}</div>`;
+}
+
+function routingCardHtml(c) {
+  return `<h3>How to reach this team</h3>${routingBlock(c.routing)}`;
+}
+
+function whyCardHtml(c, stages) {
+  return `<h3>Why this team</h3>${stages.narrative
+    ? `<ul class="bullets">${(c.why||[]).map(w => `<li>${esc(w)}</li>`).join("")}</ul>`
+    : loadingRow("Composing why-bullets…")}`;
+}
+
+function ownershipSignalsCardHtml(c) {
+  return `<h3>Ownership signals</h3>${(c.context||[]).length
+    ? `<dl class="kv">${c.context.map(s => `<dt>${esc(s.title)}</dt><dd>${esc(s.copy)}</dd>`).join("")}</dl>`
+    : loadingRow("Gathering signals…")}`;
+}
+
+function sourcesCardHtml(c, stages) {
+  return `<h3>Sources</h3><dl class="kv">
+    ${c.sources.codeowners?`<dt>CODEOWNERS</dt><dd>${esc(c.sources.codeowners)}</dd>`:""}
+    <dt>Commits scanned</dt><dd>${stages.contributors?c.sources.commits_scanned:"…"}</dd>
+    <dt>Open PRs</dt><dd>${stages.github?`${c.sources.open_prs}${c.sources.gh_degraded?" (gh degraded)":""}`:"…"}</dd>
+    <dt>LLM</dt><dd>${stages.narrative?(c.sources.llm_used?"local llama (Ollama)":"templated fallback"):"pending"}</dd>
+    <dt>Vector index</dt><dd>${c.sources.vector_index||0} paths</dd>
+  </dl>`;
+}
+
+// One-time DOM scaffold; subsequent stage events update only the affected ids.
+function renderShell(c, stages) {
+  return `
     <div class="head-card">
-      <div class="head-row">
-        <div>
-          <div class="head-path">${esc(c.path)}${c.range?` <span style="color:var(--faint)"> · L${esc(c.range)}</span>`:""}</div>
-        </div>
-        <div class="head-actions">
-          <button onclick="copyLink()">Copy link</button>
-          <button onclick="window.open('${ghPath}', '_blank')">Open in GitHub</button>
-        </div>
-      </div>
-      <div class="team-line">
-        <div class="team-name">${esc(c.summary.title)}</div>
-        <div class="team-lane">${esc(c.team.lane)}</div>
-        <span class="pill ${confColor(c.team.confidence)}">${esc(c.team.confidence)} confidence</span>
-      </div>
-      <div class="pills">
-        ${contribPill}
-        ${ghPills}
-        ${c.range?`<span class="pill amber" title="Blame is restricted to these lines">lines ${esc(c.range)}</span>`:""}
-        ${c.team.inferred?`<span class="pill amber" title="No direct CODEOWNERS rule; inferred from ${esc(c.team.inferred_from||'parent')}">ownership inferred</span>`:""}
-        ${c.sources.codeowners?`<span class="pill gray">CODEOWNERS:${esc(c.sources.codeowners.split(":").pop())}</span>`:""}
-        ${stages.contributors?`<span class="pill gray">${c.sources.commits_scanned} commits scanned</span>`:""}
-        ${llmPill}
-      </div>
-      ${routingStrip(c.routing)}
+      <div class="head-row" id="sec-head-row">${headerActionsHtml(c)}</div>
+      <div class="team-line" id="sec-team-line">${teamLineHtml(c)}</div>
+      <div class="pills" id="sec-pills">${pillsRowHtml(c, stages)}</div>
+      <div id="sec-routing-strip">${routingStrip(c.routing)}</div>
     </div>
 
     <div class="tabs">
       <button class="tab" data-tab="overview" onclick="setTab('overview')">Overview</button>
-      <button class="tab" data-tab="contributors" onclick="setTab('contributors')">Contributors${stages.contributors?` (${c.contributors.length})`:""}</button>
-      <button class="tab" data-tab="activity" onclick="setTab('activity')">Activity${stages.contributors?` (${c.timeline.length})`:""}</button>
+      <button class="tab" data-tab="contributors" onclick="setTab('contributors')" id="tab-btn-contributors">${tabsContribLabel(c, stages)}</button>
+      <button class="tab" data-tab="activity" onclick="setTab('activity')" id="tab-btn-activity">${tabsActivityLabel(c, stages)}</button>
       <button class="tab" data-tab="why" onclick="setTab('why')">Why &amp; sources</button>
     </div>
 
     <div class="tab-body" data-tab="overview">
-      <div class="card">
-        <h3>Narrative ${stages.narrative
-          ? (c.sources.llm_used
-              ? `<span class="ai-badge" title="Generated locally by Llama 3.2 via Ollama"><span class="dot"></span>local llama</span>`
-              : `<span class="ai-badge pending" title="Ollama unavailable — using deterministic template">templated</span>`)
-          : `<span class="ai-badge pending"><span class="mini-spin" style="width:8px;height:8px;border-width:1.5px;margin:0 4px 0 0"></span>local llama…</span>`}</h3>
-        ${stages.narrative
-          ? `<p class="narrative">${esc(c.summary.copy)}</p>`
-          : loadingRow("Generating narrative summary…")}
-      </div>
+      <div class="card" id="sec-narrative">${narrativeCardHtml(c, stages)}</div>
       <div class="grid-2">
-        <div class="card">
-          <h3>Top contributor</h3>
-          ${stages.contributors
-            ? (c.contributors[0] ? contribOverview(c.contributors[0]) : `<div class="rail-empty">None</div>`)
-            : loadingRow("Scoring contributors…")}
-        </div>
-        <div class="card">
-          <h3>Latest activity</h3>
-          ${stages.contributors
-            ? (latest ? workItem(latest, "merged") : `<div class="rail-empty">No commits</div>`)
-            : loadingRow("Reading recent commits…")}
-          ${stages.github
-            ? `${open ? workItem(open, "open") : ""}${jira ? workItem(jira, "jira") : ""}`
-            : loadingRow("Looking up open PRs and Jira…")}
-        </div>
+        <div class="card" id="sec-top-contrib">${topContribCardHtml(c, stages)}</div>
+        <div class="card" id="sec-latest-activity">${latestActivityCardHtml(c, stages)}</div>
       </div>
-      <div class="card">
-        ${stages.narrative ? nextStep(c) : loadingRow("Computing next step…")}
-      </div>
+      <div class="card" id="sec-next-step">${nextStepCardHtml(c, stages)}</div>
     </div>
 
     <div class="tab-body" data-tab="contributors">
-      <div class="card">
-        <h3>Contributors in this range</h3>
-        ${stages.contributors
-          ? (c.contributors.length ? c.contributors.map((p,i) => contribCard(p,i)).join("") : `<div class="rail-empty">No contributors found</div>`)
-          : loadingRow("Scoring contributors via DOK-lite…")}
-      </div>
+      <div class="card" id="sec-contributors-list">${contributorsListCardHtml(c, stages)}</div>
     </div>
 
     <div class="tab-body" data-tab="activity">
-      <div class="card">
-        <h3>What's happening here ${stages.narrative
-          ? (c.sources.llm_used
-              ? `<span class="ai-badge"><span class="dot"></span>local llama</span>`
-              : `<span class="ai-badge pending">templated</span>`)
-          : `<span class="ai-badge pending"><span class="mini-spin" style="width:8px;height:8px;border-width:1.5px;margin:0 4px 0 0"></span>local llama…</span>`}</h3>
-        ${stages.narrative
-          ? `<p class="activity-summary">${esc(c.activitySummary || c.summary.copy || "—")}</p>`
-          : `<p class="activity-summary pending">Composing activity summary…</p>`}
-      </div>
-
-      <div class="card">
-        <h3>Open work ${stages.github ? `(${(open?1:0) + (jira?1:0)})` : ""}</h3>
-        ${stages.github
-          ? ([open, jira].filter(Boolean).map(w => workItem(w, w.badge==="Open PR"?"open":"jira")).join("") || `<div class="rail-empty">Nothing open right now</div>`)
-          : loadingRow("Querying GitHub for open PRs…")}
-      </div>
-
-      <div class="card">
-        <h3>Recent commits (newest first)</h3>
-        ${stages.contributors
-          ? `<div class="tl">${c.timeline.map((t, i) => activityRow(t, c.timelineNotes?.[i], stages.narrative)).join("")}</div>`
-          : loadingRow("Reading git log…")}
-      </div>
-
-      ${stages.github ? mergedSection(c.mergedPrs) : `<div class="card"><h3>Recently merged</h3>${loadingRow("Querying GitHub for merged PRs…")}</div>`}
-
-      ${stages.github && c.evidence?.length ? `<div class="card"><h3>All evidence</h3>${c.evidence.map(e => `
-        <div class="work-item" onclick="window.open('${esc(e.url)}', '_blank')">
-          <span class="w-badge ${e.label.includes('jira')?'jira':e.label.includes('open')?'open':'merged'}">${esc(e.label)}</span>
-          <div class="w-body"><div class="w-title">${esc(e.title)}</div><div class="w-sub">${esc(e.copy)}</div></div>
-          <span class="w-arrow">↗</span>
-        </div>`).join("")}</div>` : ""}
+      <div class="card" id="sec-activity-summary">${activitySummaryCardHtml(c, stages)}</div>
+      <div class="card" id="sec-open-work">${openWorkCardHtml(c, stages)}</div>
+      <div class="card" id="sec-recent-commits">${recentCommitsCardHtml(c, stages)}</div>
+      <div id="sec-merged-wrap">${mergedSectionWrapHtml(c, stages)}</div>
+      <div id="sec-evidence-wrap">${evidenceWrapHtml(c, stages)}</div>
     </div>
 
     <div class="tab-body" data-tab="why">
-      <div class="card">
-        <h3>How to reach this team</h3>
-        ${routingBlock(c.routing)}
-      </div>
-      <div class="card">
-        <h3>Why this team</h3>
-        ${stages.narrative
-          ? `<ul class="bullets">${c.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`
-          : loadingRow("Composing why-bullets…")}
-      </div>
-      <div class="card">
-        <h3>Ownership signals</h3>
-        ${c.context.length
-          ? `<dl class="kv">${c.context.map(s => `<dt>${esc(s.title)}</dt><dd>${esc(s.copy)}</dd>`).join("")}</dl>`
-          : loadingRow("Gathering signals…")}
-      </div>
-      <div class="card">
-        <h3>Sources</h3>
-        <dl class="kv">
-          ${c.sources.codeowners?`<dt>CODEOWNERS</dt><dd>${esc(c.sources.codeowners)}</dd>`:""}
-          <dt>Commits scanned</dt><dd>${stages.contributors?c.sources.commits_scanned:"…"}</dd>
-          <dt>Open PRs</dt><dd>${stages.github?`${c.sources.open_prs}${c.sources.gh_degraded?" (gh degraded)":""}`:"…"}</dd>
-          <dt>LLM</dt><dd>${stages.narrative?(c.sources.llm_used?"local llama (Ollama)":"templated fallback"):"pending"}</dd>
-          <dt>Vector index</dt><dd>${c.sources.vector_index||0} paths</dd>
-        </dl>
-      </div>
+      <div class="card" id="sec-routing">${routingCardHtml(c)}</div>
+      <div class="card" id="sec-why">${whyCardHtml(c, stages)}</div>
+      <div class="card" id="sec-ownership-signals">${ownershipSignalsCardHtml(c)}</div>
+      <div class="card" id="sec-sources">${sourcesCardHtml(c, stages)}</div>
     </div>
   `;
-  setTab(activeTab);
+}
+
+// In-place DOM patcher: skips work if html is unchanged, flashes only on real change.
+function setHTML(id, html) {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  if (el.innerHTML === html) return false;
+  el.innerHTML = html;
+  el.classList.remove("flash-in");
+  void el.offsetWidth;  // restart animation
+  el.classList.add("flash-in");
+  return true;
+}
+
+// `justArrived` is the stage name from the latest stream event (or undefined for
+// a full repaint, e.g. on cache load). We only re-render sections that depend on
+// the arrived stage, so individual cards light up instead of the whole pane.
+function render(c, justArrived) {
+  const stages = c._stages || {};
+  const key = `${c.path}|${c.range||""}`;
+
+  // Left rail — cheap, always update; setHTML no-ops when unchanged.
+  const sim = similarRailHtml(c);
+  if (sim) {
+    $("similar-section").style.display = "block";
+    setHTML("similar", sim);
+  } else {
+    $("similar-section").style.display = "none";
+  }
+
+  // First time we render this path/range pair — paint the whole shell.
+  if (state._renderKey !== key || !document.getElementById("sec-pills")) {
+    state._renderKey = key;
+    $("pane-body").innerHTML = renderShell(c, stages);
+    setTab(activeTab);
+    return;
+  }
+
+  // Shell stage carries owner/team/routing for sections specific to it.
+  // (sec-team-line is updated unconditionally below since later stages can also
+  // refine summary/team data.)
+  if (!justArrived || justArrived === "shell") {
+    setHTML("sec-head-row", headerActionsHtml(c));
+    setHTML("sec-routing-strip", routingStrip(c.routing));
+    setHTML("sec-routing", routingCardHtml(c));
+    setHTML("sec-ownership-signals", ownershipSignalsCardHtml(c));
+  }
+  if (!justArrived || justArrived === "contributors") {
+    const tabC = document.getElementById("tab-btn-contributors");
+    if (tabC) tabC.textContent = tabsContribLabel(c, stages);
+    const tabA = document.getElementById("tab-btn-activity");
+    if (tabA) tabA.textContent = tabsActivityLabel(c, stages);
+    setHTML("sec-top-contrib", topContribCardHtml(c, stages));
+    setHTML("sec-latest-activity", latestActivityCardHtml(c, stages));
+    setHTML("sec-contributors-list", contributorsListCardHtml(c, stages));
+    setHTML("sec-recent-commits", recentCommitsCardHtml(c, stages));
+  }
+  if (!justArrived || justArrived === "github") {
+    setHTML("sec-latest-activity", latestActivityCardHtml(c, stages));  // open PR appears here
+    setHTML("sec-open-work", openWorkCardHtml(c, stages));
+    setHTML("sec-merged-wrap", mergedSectionWrapHtml(c, stages));
+    setHTML("sec-evidence-wrap", evidenceWrapHtml(c, stages));
+  }
+  if (!justArrived || justArrived === "narrative") {
+    setHTML("sec-narrative", narrativeCardHtml(c, stages));
+    setHTML("sec-next-step", nextStepCardHtml(c, stages));
+    setHTML("sec-activity-summary", activitySummaryCardHtml(c, stages));
+    setHTML("sec-recent-commits", recentCommitsCardHtml(c, stages));  // includes per-commit notes
+    setHTML("sec-why", whyCardHtml(c, stages));
+  }
+
+  // These three depend on data that arrives across multiple stages (team name
+  // becomes available in shell OR contributors; confidence in contributors;
+  // pill counts in every stage). Cheap to recompute every event — setHTML
+  // no-ops when the string is identical, so this only flashes on real change.
+  setHTML("sec-team-line", teamLineHtml(c));
+  setHTML("sec-pills", pillsRowHtml(c, stages));
+  setHTML("sec-sources", sourcesCardHtml(c, stages));
 }
 
 function confColor(c) { return c==="High"?"green":c==="Med"?"amber":"rose"; }
