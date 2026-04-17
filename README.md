@@ -31,7 +31,7 @@ These are **hard constraints**. Reject PRs that break them.
 
 3. **No chatbot.** Paste an input, get one full result screen. No conversation turns, no back-and-forth. The UI is a dashboard, not an assistant.
 
-4. **One repo at a time.** Configured via `GOBROKER_PATH`. Cross-repo lookups would require topology we deliberately don't maintain.
+4. **One repo at a time (for now).** Configured via `GOBROKER_PATH`. Multi-repo isn't implemented yet — single-repo was enough to prove the model for the hackathon.
 
 5. **No frontend framework.** Single-file `index.html` + vanilla JS + `fetch()`. No build step, no bundler, no lock-in. If you need to read the client code, it's right there.
 
