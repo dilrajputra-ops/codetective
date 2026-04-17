@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 import threading
 
-from . import gh_client, llm, recent
+from . import gh_client, gh_roster, llm, recent
 from .config import MERGED_WINDOWS_DAYS, PREWARM_TOP_N
 
 
@@ -46,9 +46,20 @@ def _warm_llm() -> None:
         print(f"[prewarm] llm warmup error: {e!r}", file=sys.stderr)
 
 
+def _warm_roster() -> None:
+    """Ensure the org-wide GitHub roster (login<->name map) is loaded. ~6s
+    cold fetch via GraphQL, cached 7 days. Does nothing if cache is fresh."""
+    try:
+        # find_login triggers a _ensure_loaded() which populates from cache
+        # (instant) or fetches if stale (~6s). Cheap no-op when hot.
+        gh_roster.find_login(name="", email="")
+        print("[prewarm] gh roster ready", file=sys.stderr)
+    except Exception as e:
+        print(f"[prewarm] gh roster error: {e!r}", file=sys.stderr)
+
+
 def kick_off() -> None:
     """Fire-and-forget prewarm in a daemon thread."""
-    t = threading.Thread(target=_warm_loop, name="prewarm-gh", daemon=True)
-    t.start()
-    t2 = threading.Thread(target=_warm_llm, name="prewarm-llm", daemon=True)
-    t2.start()
+    threading.Thread(target=_warm_loop, name="prewarm-gh", daemon=True).start()
+    threading.Thread(target=_warm_llm, name="prewarm-llm", daemon=True).start()
+    threading.Thread(target=_warm_roster, name="prewarm-roster", daemon=True).start()

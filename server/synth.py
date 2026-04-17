@@ -18,26 +18,32 @@ GH_NOREPLY_RE = re.compile(r"^(?:\d+\+)?([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))@user
 
 
 def _github_login(email: str, name: str, team_members: list[dict]) -> str:
-    """Best-effort extract a GitHub login. Empty string if we can't be sure."""
+    """Best-effort extract a GitHub login. Empty string if we can't be sure.
+
+    Resolution order (cheapest, most confident first):
+      1. GitHub noreply email -> login embedded in local-part
+      2. Fuzzy match against codeowner team roster (login substring)
+      3. Full org roster (alpacahq) via GraphQL — name or email match
+    """
     em = (email or "").strip().lower()
     if em:
         m = GH_NOREPLY_RE.match(em)
         if m:
             return m.group(1)
-    # Fallback: fuzzy-match the display name against team members from the GH
-    # Teams API. Only used when we already have the team roster — avoids any
-    # extra network calls.
-    if not name or not team_members:
-        return ""
-    n = name.lower().replace(" ", "").replace("-", "").replace(".", "")
-    for m in team_members:
-        login = (m.get("login") or "").lower()
-        member_name = (m.get("name") or "").lower().replace(" ", "").replace("-", "").replace(".", "")
-        if login and (login in n or n in login):
-            return m["login"]
-        if member_name and member_name == n:
-            return m["login"]
-    return ""
+
+    if name and team_members:
+        n = name.lower().replace(" ", "").replace("-", "").replace(".", "")
+        for m in team_members:
+            login = (m.get("login") or "").lower()
+            member_name = (m.get("name") or "").lower().replace(" ", "").replace("-", "").replace(".", "")
+            if login and (login in n or n in login):
+                return m["login"]
+            if member_name and member_name == n:
+                return m["login"]
+
+    # Final fallback: full org roster. Resolves internal engineers on files
+    # whose codeowner team they're not a member of (common in a monorepo).
+    return gh_roster.find_login(name=name, email=email)
 
 
 def _pr_number(subject: str) -> Optional[int]:
@@ -60,6 +66,7 @@ from . import (
     employees,
     expertise,
     gh_client,
+    gh_roster,
     git_ops,
     jira_client,
     jira_extract,
