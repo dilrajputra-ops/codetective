@@ -52,7 +52,7 @@ def read_file(path: str, max_bytes: int = 1_000_000, max_lines: int = 2000) -> d
 
 def blame(path: str, start: Optional[int] = None, end: Optional[int] = None) -> dict:
     """Return per-author aggregates and per-author code line snippets in the range."""
-    args = ["git", "blame", "--line-porcelain"]
+    args = ["git", "blame", "--line-porcelain", "-w", "-M", "-C"]
     if start and end:
         args += ["-L", f"{start},{end}"]
     args += ["--", path]
