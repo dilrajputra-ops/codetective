@@ -189,7 +189,23 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .tl-row:hover .tl-title{color:var(--accent)}
 .tl-date{font-size:10.5px;font-weight:600;color:var(--faint);font-family:"SF Mono",ui-monospace,monospace}
 .tl-title{font-size:13px;font-weight:600;margin:2px 0;line-height:1.4}
+.tl-title a{color:inherit;text-decoration:none}
+.tl-title a:hover{color:var(--accent);text-decoration:underline}
 .tl-meta{font-size:11px;color:var(--dim)}
+.tl-note{font-size:12px;color:var(--text);margin-top:4px;line-height:1.45;
+  padding-left:8px;border-left:2px solid var(--accent-bg)}
+.tl-note.pending{color:var(--faint);font-style:italic;border-left-color:var(--border)}
+.tl-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.tl-chip{display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;
+  padding:1px 7px;border-radius:9px;background:#fef3c7;color:var(--amber);
+  text-decoration:none;letter-spacing:.02em;border:1px solid transparent}
+.tl-chip.pr{background:var(--green-bg);color:var(--green)}
+.tl-chip.commit{background:var(--bg);color:var(--dim);border-color:var(--border)}
+.tl-chip:hover{filter:brightness(.95);text-decoration:none}
+.activity-summary{font-size:13px;color:var(--text);line-height:1.5;margin:0 0 4px 0;
+  padding:10px 12px;background:var(--accent-bg);border-radius:6px;border-left:3px solid var(--accent)}
+.activity-summary.pending{color:var(--faint);font-style:italic;background:var(--bg);
+  border-left-color:var(--border)}
 
 /* Sources / why */
 .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:12.5px}
@@ -241,6 +257,55 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 .error-card{background:#fff1f2;border:1px solid #fecdd3;color:#9f1239;padding:14px 18px;border-radius:10px}
 .error-card strong{display:block;margin-bottom:4px}
 
+/* ===== Perceived-speed: top progress bar, stale dim, skeletons ===== */
+.pane{position:relative}
+.top-progress{position:absolute;top:0;left:0;right:0;height:2px;background:transparent;
+  z-index:50;overflow:hidden;display:none;pointer-events:none}
+.top-progress.on{display:block}
+.top-progress::after{content:"";position:absolute;top:0;height:100%;width:35%;
+  background:var(--accent);animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{0%{left:-35%}100%{left:100%}}
+
+.pane-inner.is-stale{opacity:.45;pointer-events:none;transition:opacity .12s}
+
+.sk{background:linear-gradient(90deg,var(--bg) 0%,#eef0f3 50%,var(--bg) 100%);
+  background-size:200% 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:6px;display:block}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.sk-line{height:12px;margin:8px 0}
+.sk-line.lg{height:24px;width:55%;margin-bottom:14px}
+.sk-line.md{width:80%}
+.sk-line.sm{width:30%}
+.sk-pill{display:inline-block;width:80px;height:20px;border-radius:14px;margin:0 6px 6px 0;vertical-align:middle}
+.sk-card{padding:18px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px}
+.sk-row{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.sk-circ{width:36px;height:36px;border-radius:50%;flex-shrink:0}
+
+/* Inline mini-spinner + placeholder copy for stage-gated sections */
+.mini-spin{display:inline-block;width:11px;height:11px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
+  vertical-align:-1px;margin-right:6px}
+.placeholder-row{font-size:12.5px;color:var(--faint);font-style:italic;padding:8px 2px}
+.placeholder-row .mini-spin{margin-right:8px}
+.elapsed-timer{font-family:"SF Mono",ui-monospace,monospace;font-size:11px;color:var(--faint);
+  font-style:normal;margin-left:6px;opacity:.7}
+.pill.loading-pill{background:var(--bg);color:var(--faint);border:1px dashed var(--border-strong)}
+
+/* Stable layout: pre-allocate space so cards don't jump when stages arrive */
+.pills{min-height:24px;align-items:center}
+.head-card{min-height:140px}
+.card .narrative{min-height:48px}
+.tab-body[data-tab="overview"] .grid-2 > .card{min-height:128px}
+.tab-body[data-tab="overview"] > .card:last-child{min-height:80px}
+.tab-body[data-tab="contributors"] .card{min-height:240px}
+.tab-body[data-tab="activity"] .card{min-height:160px}
+
+/* AI summary badge */
+.ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  padding:2px 7px;border-radius:10px;background:var(--accent-bg);color:var(--accent);
+  margin-left:8px;vertical-align:middle;letter-spacing:.02em}
+.ai-badge.pending{background:var(--bg);color:var(--faint);border:1px dashed var(--border-strong)}
+.ai-badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block}
+
 /* Toast */
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;
   padding:8px 16px;border-radius:7px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:100}
@@ -285,6 +350,7 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 </aside>
 
 <main class="pane">
+  <div id="top-progress" class="top-progress"></div>
   <div id="pane-body" class="pane-inner">
     <div class="empty-state"><div class="em-card">
       <h2>Paste a path. See who owns it.</h2>
@@ -304,10 +370,156 @@ const PREFILL_RANGE = "";  // whole file by default — line ranges are noise fo
 const state = {
   paths: [],          // all gobroker paths for autocomplete
   recent: JSON.parse(localStorage.getItem("codemap.recent") || "[]"),
+  cache: {},          // in-memory mirror of IDB; key=path|range, val=case dict
   current: null,      // current investigation result
   busy: false,
   suggIdx: -1,
+  prefetchTimer: null,
+  prefetchInflight: new Set(),
 };
+
+// ---- result cache: in-memory mirror backed by IndexedDB (24h TTL, ~50MB quota) ----
+const CACHE_MAX = 50;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const IDB_NAME = "codetective", IDB_VER = 1, IDB_STORE = "cases";
+
+function _idbOpen() {
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error("no indexeddb"));
+    const req = indexedDB.open(IDB_NAME, IDB_VER);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(IDB_STORE)) req.result.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+async function _idbAll() {
+  const db = await _idbOpen();
+  return new Promise(res => {
+    const out = [];
+    const req = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE).openCursor();
+    req.onsuccess = e => { const c = e.target.result; if (c) { out.push([c.key, c.value]); c.continue(); } else res(out); };
+    req.onerror = () => res(out);
+  });
+}
+async function _idbPut(key, val) {
+  const db = await _idbOpen();
+  return new Promise(res => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => res();
+    tx.onerror = () => res();
+  });
+}
+async function _idbDel(key) {
+  const db = await _idbOpen();
+  return new Promise(res => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => res();
+    tx.onerror = () => res();
+  });
+}
+
+async function loadCacheFromIdb() {
+  try {
+    const all = await _idbAll();
+    let evicted = 0;
+    for (const [k, v] of all) {
+      if (v && v._cachedAt && Date.now() - v._cachedAt < CACHE_TTL_MS) {
+        state.cache[k] = v;
+      } else {
+        _idbDel(k);
+        evicted++;
+      }
+    }
+    // One-time migration from old localStorage cache.
+    const legacy = localStorage.getItem("codemap.cache");
+    if (legacy) {
+      try {
+        const obj = JSON.parse(legacy);
+        for (const k of Object.keys(obj)) {
+          if (!state.cache[k]) {
+            const v = obj[k];
+            v._cachedAt = v._cachedAt || Date.now();
+            state.cache[k] = v;
+            _idbPut(k, v);
+          }
+        }
+      } catch {}
+      localStorage.removeItem("codemap.cache");
+    }
+    if (evicted) console.log(`[cache] evicted ${evicted} stale entries`);
+  } catch (e) {
+    console.warn("[cache] idb unavailable, in-memory only", e?.message);
+  }
+}
+
+function cacheKey(path, range) { return `${path}|${range||""}`; }
+function cacheGet(path, range) {
+  const v = state.cache[cacheKey(path, range)];
+  if (!v) return null;
+  if (v._cachedAt && Date.now() - v._cachedAt > CACHE_TTL_MS) {
+    delete state.cache[cacheKey(path, range)];
+    _idbDel(cacheKey(path, range));
+    return null;
+  }
+  return v;
+}
+function cachePut(path, range, c) {
+  c._stages = c._stages || {shell: true, contributors: true, github: true, narrative: true};
+  c._cachedAt = Date.now();
+  const k = cacheKey(path, range);
+  state.cache[k] = c;
+  const keys = Object.keys(state.cache);
+  if (keys.length > CACHE_MAX) {
+    const drop = keys[0];
+    delete state.cache[drop];
+    _idbDel(drop);
+  }
+  _idbPut(k, c);
+}
+
+// ---- skeleton placeholder ----
+function renderSkeleton() {
+  return `
+    <div class="sk-card">
+      <div class="sk sk-line sm"></div>
+      <div class="sk sk-line lg"></div>
+      <div><span class="sk sk-pill"></span><span class="sk sk-pill"></span><span class="sk sk-pill"></span><span class="sk sk-pill"></span></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk sk-line sm" style="margin-bottom:14px"></div>
+      <div class="sk-row"><div class="sk sk-circ"></div><div style="flex:1"><div class="sk sk-line md"></div><div class="sk sk-line sm"></div></div></div>
+      <div class="sk-row"><div class="sk sk-circ"></div><div style="flex:1"><div class="sk sk-line md"></div><div class="sk sk-line sm"></div></div></div>
+      <div class="sk-row"><div class="sk sk-circ"></div><div style="flex:1"><div class="sk sk-line md"></div><div class="sk sk-line sm"></div></div></div>
+    </div>
+    <div class="sk-card">
+      <div class="sk sk-line sm" style="margin-bottom:12px"></div>
+      <div class="sk sk-line md"></div><div class="sk sk-line md"></div><div class="sk sk-line sm"></div>
+    </div>`;
+}
+
+// ---- hover-prefetch: warm /investigate so Enter feels instant ----
+function schedulePrefetch(path, range) {
+  clearTimeout(state.prefetchTimer);
+  state.prefetchTimer = setTimeout(() => prefetch(path, range || ""), 220);
+}
+function prefetch(path, range) {
+  if (!path || state.busy) return;
+  if (cacheGet(path, range)) return;
+  const k = cacheKey(path, range);
+  if (state.prefetchInflight.has(k)) return;
+  state.prefetchInflight.add(k);
+  fetch("/investigate", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ path, range }),
+  }).then(r => r.ok ? r.json() : null)
+    .then(c => { if (c) cachePut(path, range, c); })
+    .catch(() => {})
+    .finally(() => state.prefetchInflight.delete(k));
+}
 
 // ---- helpers ----
 const $ = id => document.getElementById(id);
@@ -328,7 +540,10 @@ async function init() {
   loadHealth();
   renderRecent();
 
-  // Run prefilled investigation
+  // Hydrate the result cache from IndexedDB so the first investigate can
+  // render an instant stale snapshot + send fp= to short-circuit if unchanged.
+  await loadCacheFromIdb();
+
   investigate({ skipPush: true });
 }
 
@@ -432,6 +647,7 @@ function renderSugg() {
   box.classList.add("on");
   box.querySelectorAll(".sugg-row").forEach(el => {
     el.onclick = () => { $("path-input").value = el.dataset.p; box.classList.remove("on"); investigate(); };
+    el.onmouseenter = () => schedulePrefetch(el.dataset.p, $("range-input").value.trim());
   });
 }
 
@@ -441,8 +657,16 @@ $("path-input").addEventListener("blur", () => setTimeout(()=>$("sugg").classLis
 $("path-input").addEventListener("keydown", e => {
   const box = $("sugg");
   const rows = box.querySelectorAll(".sugg-row");
-  if (e.key === "ArrowDown" && rows.length) { e.preventDefault(); state.suggIdx = (state.suggIdx+1)%rows.length; renderSugg(); }
-  else if (e.key === "ArrowUp" && rows.length) { e.preventDefault(); state.suggIdx = (state.suggIdx-1+rows.length)%rows.length; renderSugg(); }
+  if (e.key === "ArrowDown" && rows.length) {
+    e.preventDefault(); state.suggIdx = (state.suggIdx+1)%rows.length; renderSugg();
+    const r2 = $("sugg").querySelectorAll(".sugg-row")[state.suggIdx];
+    if (r2) schedulePrefetch(r2.dataset.p, $("range-input").value.trim());
+  }
+  else if (e.key === "ArrowUp" && rows.length) {
+    e.preventDefault(); state.suggIdx = (state.suggIdx-1+rows.length)%rows.length; renderSugg();
+    const r2 = $("sugg").querySelectorAll(".sugg-row")[state.suggIdx];
+    if (r2) schedulePrefetch(r2.dataset.p, $("range-input").value.trim());
+  }
   else if (e.key === "Enter") {
     if (state.suggIdx >= 0 && rows[state.suggIdx]) { $("path-input").value = rows[state.suggIdx].dataset.p; box.classList.remove("on"); }
     investigate();
@@ -510,7 +734,48 @@ function routingBlock(r) {
   </dl>`;
 }
 
-// ---- investigate ----
+// ---- investigate (SSE-streamed) ----
+function mergePartial(target, partial) {
+  for (const k of Object.keys(partial)) {
+    if (k === "stage") continue;
+    const v = partial[k];
+    if (v && typeof v === "object" && !Array.isArray(v) && target[k] && typeof target[k] === "object" && !Array.isArray(target[k])) {
+      Object.assign(target[k], v);
+    } else {
+      target[k] = v;
+    }
+  }
+}
+
+function streamInvestigate(path, range, fp, onPartial) {
+  return new Promise((resolve, reject) => {
+    const u = new URL("/investigate/stream", location.origin);
+    u.searchParams.set("path", path);
+    if (range) u.searchParams.set("range", range);
+    if (fp) u.searchParams.set("fp", fp);
+    const es = new EventSource(u);
+    let gotAny = false;
+    let errored = false;
+    es.onmessage = e => {
+      try { onPartial(JSON.parse(e.data)); gotAny = true; } catch {}
+    };
+    es.addEventListener("error", e => {
+      // event:error events have a data payload; raw stream errors don't.
+      if (e.data) {
+        errored = true;
+        try { reject(JSON.parse(e.data)); } catch { reject({detail: "stream error"}); }
+        es.close();
+      } else if (es.readyState === EventSource.CLOSED) {
+        if (gotAny) resolve(); else reject({detail: "connection closed before data"});
+      } else {
+        es.close();
+        if (gotAny) resolve(); else reject({detail: "connection error"});
+      }
+    });
+    es.addEventListener("done", () => { es.close(); if (!errored) resolve(); });
+  });
+}
+
 async function investigate({ skipPush=false } = {}) {
   if (state.busy) return;
   const path = $("path-input").value.trim();
@@ -518,43 +783,170 @@ async function investigate({ skipPush=false } = {}) {
   if (!path) { toast("Enter a path"); return; }
 
   state.busy = true;
-  $("go").disabled = true; $("go").textContent = "…";
-  $("pane-body").innerHTML = `<div class="loading">Investigating ${esc(path)}…</div>`;
+  $("go").disabled = true;
+  $("top-progress").classList.add("on");
+  startElapsedTicker();
 
+  // Stage A: render *something* immediately.
+  // Priority: cached result for this path > previous result (dimmed) > skeleton.
+  const cached = cacheGet(path, range);
+  let working;  // running case dict we'll merge stages into
+  if (cached) {
+    working = JSON.parse(JSON.stringify(cached));
+    state.current = working;
+    render(withDefaults(working));
+    $("pane-body").classList.add("is-stale");
+  } else if (state.current) {
+    working = {};
+    $("pane-body").classList.add("is-stale");
+  } else {
+    working = {};
+    $("pane-body").innerHTML = renderSkeleton();
+  }
+
+  // Stage B: stream the live result, re-rendering after each event.
+  // If we had a cached display we KEEP it visible and overlay fresh data on top
+  // (smoother than wiping to skeletons), otherwise initialize fresh. If the
+  // server confirms our cached fingerprint via stage:"unchanged", we skip
+  // re-rendering entirely and just bump the cache timestamp.
+  const cachedFp = cached?.fingerprint || null;
+  let firstStreamEvent = true;
+  let unchanged = false;
   try {
-    const r = await fetch("/investigate", {
-      method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ path, range }),
+    await streamInvestigate(path, range, cachedFp, partial => {
+      if (partial.stage === "unchanged") {
+        unchanged = true;
+        return;  // keep cached display as-is, finally{} will refresh timestamp
+      }
+      if (firstStreamEvent) {
+        firstStreamEvent = false;
+        if (!cached) {
+          working = {};
+          working._stages = {};
+          state.current = working;
+        }
+      }
+      mergePartial(working, partial);
+      working._stages = working._stages || {};
+      working._stages[partial.stage] = true;
+      render(withDefaults(working));
     });
-    if (!r.ok) {
-      const err = await r.json().catch(()=>({detail:r.statusText}));
-      renderError(err.detail || "Failed", path);
-      return;
-    }
-    const c = await r.json();
-    state.current = c;
-    render(c);
-    pushRecent(path, range, c.summary?.title);
+    cachePut(path, range, working);  // also refreshes _cachedAt for fp short-circuit
+    pushRecent(path, range, working.summary?.title);
     if (!skipPush) {
       const u = new URL(location.href);
       u.searchParams.set("path", path);
       if (range) u.searchParams.set("range", range); else u.searchParams.delete("range");
       history.pushState({ path, range }, "", u);
     }
-  } catch (e) { renderError(String(e), path); }
-  finally { state.busy = false; $("go").disabled = false; $("go").textContent = "Investigate"; }
+  } catch (err) {
+    // Stream failed. Fall back to the non-streaming endpoint so the user still gets a result.
+    try {
+      const r = await fetch("/investigate", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ path, range }),
+      });
+      if (!r.ok) {
+        const e2 = await r.json().catch(()=>({detail:r.statusText}));
+        renderError(e2.detail || err.detail || "Failed", path);
+      } else {
+        const c = await r.json();
+        c._stages = {shell: true, contributors: true, github: true, narrative: true};
+        state.current = c;
+        render(withDefaults(c));
+        cachePut(path, range, c);
+        pushRecent(path, range, c.summary?.title);
+      }
+    } catch (e2) {
+      renderError(err.detail || String(e2), path);
+    }
+  } finally {
+    state.busy = false;
+    $("go").disabled = false;
+    $("top-progress").classList.remove("on");
+    $("pane-body").classList.remove("is-stale");
+    stopElapsedTicker();
+  }
 }
 
 function renderError(msg, path) {
   $("pane-body").innerHTML = `<div class="error-card"><strong>Couldn't investigate ${esc(path)}</strong>${esc(msg)}</div>`;
 }
 
+// Hydrate a (possibly partial) case dict with safe defaults so render() can
+// always count on every key existing. Tracks `_stages` so render() can show
+// "loading" placeholders for cards whose data hasn't arrived yet.
+function withDefaults(c) {
+  c = c || {};
+  const stages = c._stages || {};
+  return {
+    path: c.path || "",
+    range: c.range || "",
+    similar: c.similar || [],
+    contributors: c.contributors || [],
+    timeline: c.timeline || [],
+    openPr: c.openPr || null,
+    latestPr: c.latestPr || null,
+    jira: c.jira || null,
+    mergedPrs: c.mergedPrs || {"30d":{count:0,prs:[],degraded:false},"90d":{count:0,prs:[],degraded:false}},
+    evidence: c.evidence || [],
+    why: c.why || [],
+    context: c.context || [],
+    nextStep: c.nextStep || null,
+    activitySummary: c.activitySummary || "",
+    timelineNotes: c.timelineNotes || [],
+    summary: { title: c.summary?.title || "Loading…", copy: c.summary?.copy || "" },
+    team: {
+      lane: c.team?.lane || "",
+      activity: c.team?.activity || "",
+      confidence: c.team?.confidence || "—",
+      inferred: c.team?.inferred || false,
+      inferred_from: c.team?.inferred_from,
+    },
+    routing: c.routing || {},
+    sources: {
+      codeowners: c.sources?.codeowners,
+      commits_scanned: c.sources?.commits_scanned ?? 0,
+      open_prs: c.sources?.open_prs ?? 0,
+      gh_degraded: c.sources?.gh_degraded || false,
+      llm_used: c.sources?.llm_used || false,
+      vector_index: c.sources?.vector_index ?? 0,
+    },
+    _stages: stages,
+  };
+}
+
 // ---- render ----
 let activeTab = "overview";
-function setTab(t) { activeTab = t; document.querySelectorAll(".tab").forEach(el => el.classList.toggle("on", el.dataset.tab === t));
-  document.querySelectorAll(".tab-body").forEach(el => el.classList.toggle("on", el.dataset.tab === t)); }
+const _VALID_TABS = new Set(["overview", "contributors", "activity", "why"]);
+function setTab(t) {
+  if (!_VALID_TABS.has(t)) t = "overview";
+  activeTab = t;
+  document.querySelectorAll(".tab").forEach(el => el.classList.toggle("on", el.dataset.tab === t));
+  document.querySelectorAll(".tab-body").forEach(el => el.classList.toggle("on", el.dataset.tab === t));
+}
+
+function loadingRow(label) {
+  return `<div class="placeholder-row"><span class="mini-spin"></span>${esc(label)}<span class="elapsed-timer"></span></div>`;
+}
+
+let _elapsedTick = null;
+function startElapsedTicker() {
+  state.streamStart = Date.now();
+  if (_elapsedTick) clearInterval(_elapsedTick);
+  const tick = () => {
+    const s = ((Date.now() - state.streamStart) / 1000).toFixed(1);
+    document.querySelectorAll(".elapsed-timer").forEach(el => el.textContent = s + "s");
+  };
+  tick();
+  _elapsedTick = setInterval(tick, 200);
+}
+function stopElapsedTicker() {
+  if (_elapsedTick) { clearInterval(_elapsedTick); _elapsedTick = null; }
+}
 
 function render(c) {
+  const stages = c._stages || {};
   // Similar files in left rail
   const sim = c.similar || [];
   if (sim.length) {
@@ -573,6 +965,17 @@ function render(c) {
   const jira = c.jira;
   const ghPath = `https://github.com/alpacahq/gobroker/blob/master/${c.path}${c.range?'#L'+c.range.split('-')[0]:''}`;
 
+  // Stage-gated header pills: PR/merged counts only after github stage; otherwise show a "fetching" chip.
+  const ghPills = stages.github
+    ? `<span class="pill ${c.sources.open_prs?'amber':'gray'}">${c.sources.open_prs} open PR${c.sources.open_prs===1?"":"s"}</span>${mergedPills(c.mergedPrs)}${c.sources.gh_degraded?`<span class="pill rose">gh degraded</span>`:""}`
+    : `<span class="pill loading-pill"><span class="mini-spin"></span>fetching PRs…</span>`;
+  const contribPill = stages.contributors
+    ? `<span class="pill indigo">${c.contributors.length} contributors</span><span class="pill green">${c.timeline.length} commits shown</span>`
+    : `<span class="pill loading-pill"><span class="mini-spin"></span>scanning blame…</span>`;
+  const llmPill = stages.narrative
+    ? (c.sources.llm_used?`<span class="pill gray">local llama</span>`:`<span class="pill gray">templated fallback</span>`)
+    : `<span class="pill loading-pill"><span class="mini-spin"></span>narrative…</span>`;
+
   $("pane-body").innerHTML = `
     <div class="head-card">
       <div class="head-row">
@@ -590,81 +993,100 @@ function render(c) {
         <span class="pill ${confColor(c.team.confidence)}">${esc(c.team.confidence)} confidence</span>
       </div>
       <div class="pills">
-        <span class="pill indigo">${c.contributors.length} contributors</span>
-        <span class="pill green">${c.timeline.length} commits shown</span>
-        <span class="pill ${c.sources.open_prs?'amber':'gray'}">${c.sources.open_prs} open PR${c.sources.open_prs===1?"":"s"}</span>
+        ${contribPill}
+        ${ghPills}
         ${c.range?`<span class="pill amber" title="Blame is restricted to these lines">lines ${esc(c.range)}</span>`:""}
         ${c.team.inferred?`<span class="pill amber" title="No direct CODEOWNERS rule; inferred from ${esc(c.team.inferred_from||'parent')}">ownership inferred</span>`:""}
         ${c.sources.codeowners?`<span class="pill gray">CODEOWNERS:${esc(c.sources.codeowners.split(":").pop())}</span>`:""}
-        <span class="pill gray">${c.sources.commits_scanned} commits scanned</span>
-        ${c.sources.llm_used?`<span class="pill gray">local llama</span>`:""}
-        ${c.sources.gh_degraded?`<span class="pill rose">gh degraded</span>`:""}
+        ${stages.contributors?`<span class="pill gray">${c.sources.commits_scanned} commits scanned</span>`:""}
+        ${llmPill}
       </div>
       ${routingStrip(c.routing)}
     </div>
 
     <div class="tabs">
       <button class="tab" data-tab="overview" onclick="setTab('overview')">Overview</button>
-      <button class="tab" data-tab="contributors" onclick="setTab('contributors')">Contributors (${c.contributors.length})</button>
-      <button class="tab" data-tab="timeline" onclick="setTab('timeline')">Timeline (${c.timeline.length})</button>
-      <button class="tab" data-tab="work" onclick="setTab('work')">Open work</button>
+      <button class="tab" data-tab="contributors" onclick="setTab('contributors')">Contributors${stages.contributors?` (${c.contributors.length})`:""}</button>
+      <button class="tab" data-tab="activity" onclick="setTab('activity')">Activity${stages.contributors?` (${c.timeline.length})`:""}</button>
       <button class="tab" data-tab="why" onclick="setTab('why')">Why &amp; sources</button>
     </div>
 
     <div class="tab-body" data-tab="overview">
       <div class="card">
-        <h3>Narrative</h3>
-        <p class="narrative">${esc(c.summary.copy)}</p>
+        <h3>Narrative ${stages.narrative
+          ? (c.sources.llm_used
+              ? `<span class="ai-badge" title="Generated locally by Llama 3.2 via Ollama"><span class="dot"></span>local llama</span>`
+              : `<span class="ai-badge pending" title="Ollama unavailable — using deterministic template">templated</span>`)
+          : `<span class="ai-badge pending"><span class="mini-spin" style="width:8px;height:8px;border-width:1.5px;margin:0 4px 0 0"></span>local llama…</span>`}</h3>
+        ${stages.narrative
+          ? `<p class="narrative">${esc(c.summary.copy)}</p>`
+          : loadingRow("Generating narrative summary…")}
       </div>
       <div class="grid-2">
         <div class="card">
           <h3>Top contributor</h3>
-          ${c.contributors[0] ? contribOverview(c.contributors[0]) : `<div class="rail-empty">None</div>`}
+          ${stages.contributors
+            ? (c.contributors[0] ? contribOverview(c.contributors[0]) : `<div class="rail-empty">None</div>`)
+            : loadingRow("Scoring contributors…")}
         </div>
         <div class="card">
           <h3>Latest activity</h3>
-          ${latest ? workItem(latest, "merged") : `<div class="rail-empty">No commits</div>`}
-          ${open ? workItem(open, "open") : ""}
-          ${jira ? workItem(jira, "jira") : ""}
+          ${stages.contributors
+            ? (latest ? workItem(latest, "merged") : `<div class="rail-empty">No commits</div>`)
+            : loadingRow("Reading recent commits…")}
+          ${stages.github
+            ? `${open ? workItem(open, "open") : ""}${jira ? workItem(jira, "jira") : ""}`
+            : loadingRow("Looking up open PRs and Jira…")}
         </div>
       </div>
       <div class="card">
-        ${nextStep(c)}
+        ${stages.narrative ? nextStep(c) : loadingRow("Computing next step…")}
       </div>
     </div>
 
     <div class="tab-body" data-tab="contributors">
       <div class="card">
         <h3>Contributors in this range</h3>
-        ${c.contributors.map((p,i) => contribCard(p,i)).join("")}
+        ${stages.contributors
+          ? (c.contributors.length ? c.contributors.map((p,i) => contribCard(p,i)).join("") : `<div class="rail-empty">No contributors found</div>`)
+          : loadingRow("Scoring contributors via DOK-lite…")}
       </div>
     </div>
 
-    <div class="tab-body" data-tab="timeline">
+    <div class="tab-body" data-tab="activity">
+      <div class="card">
+        <h3>What's happening here ${stages.narrative
+          ? (c.sources.llm_used
+              ? `<span class="ai-badge"><span class="dot"></span>local llama</span>`
+              : `<span class="ai-badge pending">templated</span>`)
+          : `<span class="ai-badge pending"><span class="mini-spin" style="width:8px;height:8px;border-width:1.5px;margin:0 4px 0 0"></span>local llama…</span>`}</h3>
+        ${stages.narrative
+          ? `<p class="activity-summary">${esc(c.activitySummary || c.summary.copy || "—")}</p>`
+          : `<p class="activity-summary pending">Composing activity summary…</p>`}
+      </div>
+
+      <div class="card">
+        <h3>Open work ${stages.github ? `(${(open?1:0) + (jira?1:0)})` : ""}</h3>
+        ${stages.github
+          ? ([open, jira].filter(Boolean).map(w => workItem(w, w.badge==="Open PR"?"open":"jira")).join("") || `<div class="rail-empty">Nothing open right now</div>`)
+          : loadingRow("Querying GitHub for open PRs…")}
+      </div>
+
       <div class="card">
         <h3>Recent commits (newest first)</h3>
-        <div class="tl">
-          ${c.timeline.map(t => `
-            <div class="tl-row" onclick="window.open('https://github.com/alpacahq/gobroker/commit/${esc(t.copy.split('· ').pop())}', '_blank')">
-              <div class="tl-date">${esc(t.date)}</div>
-              <div class="tl-title">${esc(t.title)}</div>
-              <div class="tl-meta">${esc(t.copy)}</div>
-            </div>`).join("")}
-        </div>
+        ${stages.contributors
+          ? `<div class="tl">${c.timeline.map((t, i) => activityRow(t, c.timelineNotes?.[i], stages.narrative)).join("")}</div>`
+          : loadingRow("Reading git log…")}
       </div>
-    </div>
 
-    <div class="tab-body" data-tab="work">
-      <div class="card">
-        <h3>Open PRs &amp; Jira</h3>
-        ${[open, latest, jira].filter(Boolean).map(w => workItem(w, w.badge==="Open PR"?"open":w.badge==="Jira"?"jira":"merged")).join("") || `<div class="rail-empty">Nothing in flight</div>`}
-        ${c.evidence?.length ? `<h3 style="margin-top:18px">All evidence</h3>${c.evidence.map(e => `
-          <div class="work-item" onclick="window.open('${esc(e.url)}', '_blank')">
-            <span class="w-badge ${e.label.includes('jira')?'jira':e.label.includes('open')?'open':'merged'}">${esc(e.label)}</span>
-            <div class="w-body"><div class="w-title">${esc(e.title)}</div><div class="w-sub">${esc(e.copy)}</div></div>
-            <span class="w-arrow">↗</span>
-          </div>`).join("")}` : ""}
-      </div>
+      ${stages.github ? mergedSection(c.mergedPrs) : `<div class="card"><h3>Recently merged</h3>${loadingRow("Querying GitHub for merged PRs…")}</div>`}
+
+      ${stages.github && c.evidence?.length ? `<div class="card"><h3>All evidence</h3>${c.evidence.map(e => `
+        <div class="work-item" onclick="window.open('${esc(e.url)}', '_blank')">
+          <span class="w-badge ${e.label.includes('jira')?'jira':e.label.includes('open')?'open':'merged'}">${esc(e.label)}</span>
+          <div class="w-body"><div class="w-title">${esc(e.title)}</div><div class="w-sub">${esc(e.copy)}</div></div>
+          <span class="w-arrow">↗</span>
+        </div>`).join("")}</div>` : ""}
     </div>
 
     <div class="tab-body" data-tab="why">
@@ -674,21 +1096,23 @@ function render(c) {
       </div>
       <div class="card">
         <h3>Why this team</h3>
-        <ul class="bullets">${c.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>
+        ${stages.narrative
+          ? `<ul class="bullets">${c.why.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`
+          : loadingRow("Composing why-bullets…")}
       </div>
       <div class="card">
         <h3>Ownership signals</h3>
-        <dl class="kv">
-          ${c.context.map(s => `<dt>${esc(s.title)}</dt><dd>${esc(s.copy)}</dd>`).join("")}
-        </dl>
+        ${c.context.length
+          ? `<dl class="kv">${c.context.map(s => `<dt>${esc(s.title)}</dt><dd>${esc(s.copy)}</dd>`).join("")}</dl>`
+          : loadingRow("Gathering signals…")}
       </div>
       <div class="card">
         <h3>Sources</h3>
         <dl class="kv">
           ${c.sources.codeowners?`<dt>CODEOWNERS</dt><dd>${esc(c.sources.codeowners)}</dd>`:""}
-          <dt>Commits scanned</dt><dd>${c.sources.commits_scanned}</dd>
-          <dt>Open PRs</dt><dd>${c.sources.open_prs}${c.sources.gh_degraded?" (gh degraded)":""}</dd>
-          <dt>LLM</dt><dd>${c.sources.llm_used?"local llama (Ollama)":"templated fallback"}</dd>
+          <dt>Commits scanned</dt><dd>${stages.contributors?c.sources.commits_scanned:"…"}</dd>
+          <dt>Open PRs</dt><dd>${stages.github?`${c.sources.open_prs}${c.sources.gh_degraded?" (gh degraded)":""}`:"…"}</dd>
+          <dt>LLM</dt><dd>${stages.narrative?(c.sources.llm_used?"local llama (Ollama)":"templated fallback"):"pending"}</dd>
           <dt>Vector index</dt><dd>${c.sources.vector_index||0} paths</dd>
         </dl>
       </div>
@@ -751,6 +1175,43 @@ function avatar(p) {
   return `<div class="av-wrap"><div class="av" style="background:${esc(p.color)}">${esc(p.initials)}</div>${dot}</div>`;
 }
 
+function mergedPills(m) {
+  if (!m) return "";
+  const c30 = m['30d']?.count || 0;
+  const c90 = m['90d']?.count || 0;
+  const cls = c30 > 0 ? "green" : "gray";
+  let out = `<span class="pill ${cls}" title="Merged in last 30 days">${c30} merged 30d</span>`;
+  if (c90 > c30) out += `<span class="pill gray" title="Merged in last 90 days">${c90} merged 90d</span>`;
+  if (m['30d']?.degraded || m['90d']?.degraded) out += `<span class="pill rose" title="Merged-PR fetch failed for one of the windows">merged degraded</span>`;
+  return out;
+}
+
+function mergedSection(m) {
+  if (!m) return "";
+  const w30 = m['30d'] || {prs:[], count:0};
+  const w90 = m['90d'] || {prs:[], count:0};
+  if (!w30.count && !w90.count) return "";
+  const sectionId = "merged-90d-list";
+  const has90Extra = w90.count > w30.count;
+  const expandToggle = has90Extra
+    ? `<span class="contrib-toggle" onclick="document.getElementById('${sectionId}').classList.toggle('on')">show 90d (${w90.count} total)</span>`
+    : "";
+  const prs30Html = w30.prs.length
+    ? w30.prs.map(p => workItem(p, "merged")).join("")
+    : `<div class="rail-empty">No merged PRs in last 30 days</div>`;
+  const prs90Only = w90.prs.filter(p90 => !w30.prs.find(p30 => p30.id === p90.id));
+  const prs90Html = prs90Only.length
+    ? prs90Only.map(p => workItem(p, "merged")).join("")
+    : `<div class="rail-empty">Nothing extra in 90d window</div>`;
+  return `<div class="card">
+    <h3 style="display:flex;justify-content:space-between;align-items:center">
+      <span>Recently merged · last 30d (${w30.count})</span>${expandToggle}
+    </h3>
+    ${prs30Html}
+    ${has90Extra ? `<div id="${sectionId}" class="snippets" style="background:transparent;padding:0;margin-top:10px"><h3 style="margin-bottom:8px">Also in 90d window</h3>${prs90Html}</div>` : ""}
+  </div>`;
+}
+
 function workItem(w, kind) {
   return `<div class="work-item" onclick="window.open('${esc(w.url)}','_blank')">
     <span class="w-badge ${kind}">${esc(w.badge)}</span>
@@ -760,6 +1221,41 @@ function workItem(w, kind) {
     </div>
     <span class="w-arrow">↗</span>
   </div>`;
+}
+
+// Build a single timeline row for the Activity tab.
+// Falls back gracefully when fields aren't present on legacy/cached cases.
+function activityRow(t, note, narrativeReady) {
+  const sha = t.sha || (t.copy ? t.copy.split('· ').pop() : "");
+  const url = t.url || (sha ? `https://github.com/alpacahq/gobroker/commit/${sha}` : "#");
+  const meta = t.copy || `${t.author || ""}${t.when ? ` · ${t.when}` : ""}${sha ? ` · ${sha}` : ""}`;
+  const title = linkifyJira(esc(t.title || ""));
+  const chips = [];
+  if (t.pr_number) {
+    chips.push(`<a class="tl-chip pr" href="https://github.com/alpacahq/gobroker/pull/${t.pr_number}" target="_blank" rel="noopener" onclick="event.stopPropagation()">PR #${t.pr_number}</a>`);
+  } else if (sha) {
+    chips.push(`<a class="tl-chip commit" href="${esc(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">commit ${esc(sha)}</a>`);
+  }
+  for (const j of (t.jira || [])) {
+    chips.push(`<a class="tl-chip" href="${esc(j.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(j.id)}</a>`);
+  }
+  const noteHtml = narrativeReady
+    ? (note ? `<div class="tl-note">${linkifyJira(esc(note))}</div>` : "")
+    : `<div class="tl-note pending"><span class="mini-spin" style="width:9px;height:9px;border-width:1.5px;margin-right:6px"></span>summarizing…</div>`;
+  return `<div class="tl-row" onclick="window.open('${esc(url)}','_blank')">
+    <div class="tl-date">${esc(t.date || "")}</div>
+    <div class="tl-title">${title}</div>
+    <div class="tl-meta">${esc(meta)}</div>
+    ${chips.length ? `<div class="tl-chips">${chips.join("")}</div>` : ""}
+    ${noteHtml}
+  </div>`;
+}
+
+const _JIRA_RE = /\b([A-Z]{2,8}-\d+)\b/g;
+function linkifyJira(escapedHtml) {
+  // Operates on already-escaped HTML; safe to inject anchor tags.
+  return escapedHtml.replace(_JIRA_RE,
+    '<a class="tl-chip" style="margin:0 2px;vertical-align:1px" href="https://alpaca.atlassian.net/browse/$1" target="_blank" rel="noopener" onclick="event.stopPropagation()">$1</a>');
 }
 
 function nextStep(c) {
